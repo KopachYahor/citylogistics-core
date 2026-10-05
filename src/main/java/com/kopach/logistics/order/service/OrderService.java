@@ -14,9 +14,11 @@ import java.util.List;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final OrderEventPublisher eventPublisher;
 
-    public OrderService(OrderRepository orderRepository) {
+    public OrderService(OrderRepository orderRepository, OrderEventPublisher eventPublisher) {
         this.orderRepository = orderRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     public OrderResponse createOrder(CreateOrderRequest request, Long clientId) {
@@ -30,6 +32,7 @@ public class OrderService {
         order.setUpdatedAt(LocalDateTime.now());
 
         Order saved = orderRepository.save(order);
+        eventPublisher.publishOrderCreated(saved.getId());
         return mapToResponse(saved);
     }
 
