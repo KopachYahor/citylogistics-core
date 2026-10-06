@@ -35,7 +35,12 @@ spring:
 server:
   port: 8080
 
+jwt:
+  secret: bXktc3VwZXItc2VjcmV0LWtleS1mb3Itand0LXNpZ25pbmctbWluLTMyLWJ5dGVzLWxvbmc
+  expiration: 86400000
+
 logging:
   level:
     com.kopach.logistics: DEBUG
     org.springframework.kafka: INFO
+    org.springframework.security: INFO
