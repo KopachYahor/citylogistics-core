@@ -1,0 +1,3 @@
+com\kopach\logistics\common\HealthControllerTest.class
+com\kopach\logistics\auth\controller\AuthControllerTest.class
+com\kopach\logistics\order\service\OrderServiceTest.class

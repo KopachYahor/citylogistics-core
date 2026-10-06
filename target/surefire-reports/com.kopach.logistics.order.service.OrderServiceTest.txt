@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.kopach.logistics.order.service.OrderServiceTest
+-------------------------------------------------------------------------------
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.158 s -- in com.kopach.logistics.order.service.OrderServiceTest
