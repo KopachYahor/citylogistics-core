@@ -1,5 +1,0 @@
-com\kopach\logistics\common\HealthControllerTest.class
-com\kopach\logistics\order\repository\OrderRepositoryTest.class
-com\kopach\logistics\auth\controller\AuthControllerTest.class
-com\kopach\logistics\order\service\OrderServiceTest.class
-com\kopach\logistics\config\PostgresTestContainer.class
