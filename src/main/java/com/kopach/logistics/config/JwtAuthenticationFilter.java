@@ -36,13 +36,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         final String authHeader = request.getHeader("Authorization");
 
-        // Если нет заголовка или он не начинается с "Bearer " — пропускаем запрос дальше
+        // Если нет заголовка или он не начинается с "Bearer" — пропускаем запрос дальше
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
-
-        // Извлекаем токен (убираем "Bearer " — 7 символов)
         final String jwt = authHeader.substring(7);
 
         try {
