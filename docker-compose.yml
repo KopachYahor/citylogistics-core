@@ -12,6 +12,19 @@ services:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
 
+  postgres-drivers:
+    image: postgres:15
+    container_name: logistics-postgres-drivers
+    environment:
+      POSTGRES_DB: drivers
+      POSTGRES_USER: drivers
+      POSTGRES_PASSWORD: drivers
+    ports:
+      - "5433:5432"
+    volumes:
+      - drivers_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
   kafka:
     image: confluentinc/cp-kafka:7.6.0
     container_name: logistics-kafka
@@ -42,3 +55,4 @@ services:
 
 volumes:
   postgres_data:
+  drivers_data:

@@ -1,5 +1,6 @@
-package com.kopach.logistics.order.listener;
+package com.kopach.logistics.order.service;
 
+import com.kopach.logistics.order.dto.OrderCreatedEvent;
 import com.kopach.logistics.order.entity.Order;
 import com.kopach.logistics.order.entity.OrderStatus;
 import com.kopach.logistics.order.repository.OrderRepository;
@@ -18,9 +19,9 @@ public class OrderProcessingListener {
     }
 
     @KafkaListener(topics = "order.created", groupId = "logistics-group")
-    public void handleOrderCreated(String orderId) {
-        Order order = orderRepository.findById(Long.parseLong(orderId))
-                .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
+    public void handleOrderCreated(OrderCreatedEvent event) {
+        Order order = orderRepository.findById(event.getOrderId())
+                .orElseThrow(() -> new IllegalStateException("Order not found: " + event.getOrderId()));
 
         order.setStatus(OrderStatus.PROCESSING);
         order.setUpdatedAt(LocalDateTime.now());
