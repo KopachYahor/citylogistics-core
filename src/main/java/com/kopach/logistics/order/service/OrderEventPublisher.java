@@ -1,18 +1,21 @@
 package com.kopach.logistics.order.service;
 
+import com.kopach.logistics.order.dto.OrderCreatedEvent;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
 public class OrderEventPublisher {
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private static final String TOPIC_ORDER_CREATED = "order.created";
 
-    public OrderEventPublisher(KafkaTemplate<String, String> kafkaTemplate) {
+    private final KafkaTemplate<String, Object> kafkaTemplate;
+
+    public OrderEventPublisher(KafkaTemplate<String, Object> kafkaTemplate) {
         this.kafkaTemplate = kafkaTemplate;
     }
 
-    public void publishOrderCreated(Long orderId) {
-        kafkaTemplate.send("order.created", orderId.toString(), orderId.toString());
+    public void publishOrderCreated(OrderCreatedEvent event) {
+        kafkaTemplate.send(TOPIC_ORDER_CREATED, event.getOrderId().toString(), event);
     }
 }

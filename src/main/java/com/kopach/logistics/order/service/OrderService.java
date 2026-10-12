@@ -1,6 +1,7 @@
 package com.kopach.logistics.order.service;
 
 import com.kopach.logistics.order.dto.CreateOrderRequest;
+import com.kopach.logistics.order.dto.OrderCreatedEvent;
 import com.kopach.logistics.order.dto.OrderResponse;
 import com.kopach.logistics.order.entity.Order;
 import com.kopach.logistics.order.entity.OrderStatus;
@@ -32,7 +33,18 @@ public class OrderService {
         order.setUpdatedAt(LocalDateTime.now());
 
         Order saved = orderRepository.save(order);
-        eventPublisher.publishOrderCreated(saved.getId());
+
+        OrderCreatedEvent event = new OrderCreatedEvent(
+                saved.getId(),
+                saved.getClientId(),
+                saved.getFromAddress(),
+                saved.getToAddress(),
+                saved.getPrice(),
+                saved.getStatus().name(),
+                saved.getCreatedAt()
+        );
+        eventPublisher.publishOrderCreated(event);
+
         return mapToResponse(saved);
     }
 
