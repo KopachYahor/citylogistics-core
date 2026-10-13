@@ -1,7 +1,6 @@
 CREATE TABLE orders (
                         id BIGSERIAL PRIMARY KEY,
                         client_id BIGINT NOT NULL REFERENCES users(id),
-                        driver_id BIGINT REFERENCES users(id),
                         status VARCHAR(20) NOT NULL,
                         from_address VARCHAR(500) NOT NULL,
                         to_address VARCHAR(500) NOT NULL,
