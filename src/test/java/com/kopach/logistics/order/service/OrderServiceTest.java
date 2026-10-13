@@ -11,7 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
+import com.kopach.logistics.order.dto.OrderCreatedEvent;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -71,8 +71,7 @@ class OrderServiceTest {
         assertThat(response.getStatus()).isEqualTo(OrderStatus.NEW);
 
         verify(orderRepository, times(1)).save(any(Order.class));
-        verify(eventPublisher, times(1)).publishOrderCreated(1L);
-    }
+        verify(eventPublisher, times(1)).publishOrderCreated(any(OrderCreatedEvent.class));    }
 
     // ============ cancelOrder — успешная отмена ============
 

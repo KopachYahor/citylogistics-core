@@ -44,3 +44,7 @@ logging:
     com.kopach.logistics: DEBUG
     org.springframework.kafka: INFO
     org.springframework.security: INFO
+
+app:
+  cors:
+    allowed-origins: http://localhost:5500,http://127.0.0.1:5500
