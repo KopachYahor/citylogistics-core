@@ -1,1 +1,1 @@
-ALTER TABLE orders DROP CONSTRAINT fk_orders_driver;
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS fk_orders_driver;
