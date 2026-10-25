@@ -43,7 +43,7 @@ class OrderRepositoryTest {
     void saveAndFindByClientId_shouldReturnOrdersForSpecificClient() {
         // given
         Order order1 = createOrder(client1Id, OrderStatus.NEW, "Минск", "Гомель");
-        Order order2 = createOrder(client1Id, OrderStatus.PROCESSING, "Минск", "Брест");
+        Order order2 = createOrder(client1Id, OrderStatus.ACCEPTED, "Минск", "Брест");
         Order order3 = createOrder(client2Id, OrderStatus.NEW, "Минск", "Витебск");
 
         orderRepository.save(order1);
@@ -58,7 +58,7 @@ class OrderRepositoryTest {
         assertThat(client1Orders).hasSize(2);
         assertThat(client2Orders).hasSize(1);
         assertThat(client1Orders).extracting(Order::getStatus)
-                .containsExactlyInAnyOrder(OrderStatus.NEW, OrderStatus.PROCESSING);
+                .containsExactlyInAnyOrder(OrderStatus.NEW, OrderStatus.ACCEPTED);
     }
 
     @Test
@@ -81,7 +81,7 @@ class OrderRepositoryTest {
     private User newUser(String email) {
         return new User(
                 email,
-                "$2a$10$testtesttesttesttesttesttesttesttesttesttesttesttesttest", // фиктивный bcrypt-хэш
+                "$2a$10$testtesttesttesttesttesttesttesttesttesttesttesttesttest",
                 Role.CLIENT,
                 LocalDateTime.now()
         );

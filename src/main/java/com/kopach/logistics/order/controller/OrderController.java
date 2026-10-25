@@ -3,6 +3,7 @@ package com.kopach.logistics.order.controller;
 import com.kopach.logistics.auth.entity.User;
 import com.kopach.logistics.order.dto.CreateOrderRequest;
 import com.kopach.logistics.order.dto.OrderResponse;
+import com.kopach.logistics.order.dto.UpdateOrderStatusRequest;
 import com.kopach.logistics.order.service.OrderService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -33,10 +34,23 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getMyOrders(user.getId()));
     }
 
+    @GetMapping("/assigned")
+    public ResponseEntity<List<OrderResponse>> getAssigned(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(orderService.getAssignedOrders(user.getId()));
+    }
+
     @PatchMapping("/{id}/cancel")
     public ResponseEntity<OrderResponse> cancel(
             @PathVariable Long id,
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(orderService.cancelOrder(id, user.getId()));
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<OrderResponse> updateStatus(
+            @PathVariable Long id,
+            @RequestBody @Valid UpdateOrderStatusRequest request,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(orderService.updateStatus(id, request.getStatus(), user.getId()));
     }
 }

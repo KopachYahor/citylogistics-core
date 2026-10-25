@@ -1,0 +1,1 @@
+UPDATE orders SET status = 'ACCEPTED' WHERE status = 'PROCESSING';

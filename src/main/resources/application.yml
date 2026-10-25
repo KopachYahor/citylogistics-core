@@ -48,3 +48,16 @@ logging:
 app:
   cors:
     allowed-origins: http://localhost:5500,http://127.0.0.1:5500
+services:
+  driver-service:
+    url: http://localhost:8082
+    logging:
+      level:
+        com.kopach.logistics.config: DEBUG
+        org.springframework.security: DEBUG
+        org.springframework.security.web: DEBUG
+        org.springframework.security.web.access: DEBUG
+        org.springframework.security.web.access.ExceptionTranslationFilter: DEBUG
+        org.springframework.security.web.authentication: DEBUG
+        org.springframework.security.web.csrf: DEBUG
+        org.springframework.web.filter: DEBUG
