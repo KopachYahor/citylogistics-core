@@ -34,11 +34,11 @@ public class DriverAssignedListener {
                         "Order not found: " + event.getOrderId()));
 
         order.setDriverId(event.getDriverId());
-        order.setStatus(OrderStatus.PROCESSING);
+        order.setStatus(OrderStatus.ACCEPTED);
         order.setUpdatedAt(LocalDateTime.now());
         orderRepository.save(order);
 
-        log.info("Order {} assigned to driver {}, status=PROCESSING",
+        log.info("Order {} assigned to driver {}, status=ACCEPTED",
                 order.getId(), event.getDriverId());
     }
 }
