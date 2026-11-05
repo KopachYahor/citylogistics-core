@@ -1,8 +1,6 @@
 package com.kopach.logistics.driver.dto;
 
-import java.io.Serializable;
-
-public class DriverAssignedEvent implements Serializable {
+public class DriverAssignedEvent {
 
     private Long orderId;
     private Long driverId;

@@ -1,8 +1,6 @@
 package com.kopach.logistics.order.dto;
 
-import java.io.Serializable;
-
-public class OrderStatusChangedEvent implements Serializable {
+public class OrderStatusChangedEvent {
 
     private Long orderId;
     private Long driverId;

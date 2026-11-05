@@ -1,10 +1,9 @@
 package com.kopach.logistics.order.dto;
 
-import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-public class OrderCreatedEvent implements Serializable {
+public class OrderCreatedEvent {
 
     private Long orderId;
     private Long clientId;
