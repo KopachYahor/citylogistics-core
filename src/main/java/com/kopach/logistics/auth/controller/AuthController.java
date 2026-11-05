@@ -3,6 +3,7 @@ package com.kopach.logistics.auth.controller;
 import com.kopach.logistics.auth.dto.AuthResponse;
 import com.kopach.logistics.auth.dto.LoginRequest;
 import com.kopach.logistics.auth.dto.RegisterRequest;
+import com.kopach.logistics.auth.dto.UserResponse;
 import com.kopach.logistics.auth.entity.User;
 import com.kopach.logistics.auth.service.AuthService;
 import jakarta.validation.Valid;
@@ -34,11 +35,10 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(request));
     }
 
+    // Без токена сюда не попасть: SecurityConfig сам вернёт 401,
+    // поэтому user здесь всегда не null.
     @GetMapping("/me")
-    public ResponseEntity<User> me(@AuthenticationPrincipal User user) {
-        if (user == null) {
-            return ResponseEntity.status(401).build();
-        }
-        return ResponseEntity.ok(user);
+    public ResponseEntity<UserResponse> me(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(UserResponse.from(user));
     }
 }
