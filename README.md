@@ -21,4 +21,9 @@
 
 ## Запуск
 1. `docker compose up -d` (поднимет 2 базы PostgreSQL, Kafka, Kafka-UI).
-2. `./mvnw spring-boot:run` (порт 8080, Flyway применит миграции).
+2. Задайте секрет для подписи JWT (в git его нет, без него приложение не стартует).
+   Сгенерировать можно так: `openssl rand -base64 48`.
+   - PowerShell: `$env:JWT_SECRET="<ваш_секрет>"`
+   - bash: `export JWT_SECRET="<ваш_секрет>"`
+   - IntelliJ IDEA: Run Configuration → Environment variables → `JWT_SECRET=<ваш_секрет>`
+3. `./mvnw spring-boot:run` (Windows: `.\mvnw.cmd spring-boot:run`), порт 8080, Flyway применит миграции.
