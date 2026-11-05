@@ -21,9 +21,13 @@ public class DriverServiceClient {
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2); // установить соединение
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(5);    // дождаться ответа
 
+    // driver-service пускает к своему REST только с этим заголовком (InternalApiKeyFilter там)
+    private static final String API_KEY_HEADER = "X-Internal-Api-Key";
+
     private final RestClient restClient;
 
-    public DriverServiceClient(@Value("${services.driver-service.url}") String baseUrl) {
+    public DriverServiceClient(@Value("${services.driver-service.url}") String baseUrl,
+                               @Value("${services.driver-service.api-key}") String apiKey) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(CONNECT_TIMEOUT);
         requestFactory.setReadTimeout(READ_TIMEOUT);
@@ -31,6 +35,7 @@ public class DriverServiceClient {
         this.restClient = RestClient.builder()
                 .baseUrl(baseUrl)
                 .requestFactory(requestFactory)
+                .defaultHeader(API_KEY_HEADER, apiKey) // добавляется к каждому запросу
                 .build();
         log.info("DriverServiceClient configured with base URL: {}", baseUrl);
     }
