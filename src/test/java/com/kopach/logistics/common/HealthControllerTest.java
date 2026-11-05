@@ -1,5 +1,6 @@
 package com.kopach.logistics.common;
 
+import com.kopach.logistics.config.AbstractPostgresTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -12,7 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-class HealthControllerTest {
+class HealthControllerTest extends AbstractPostgresTest {
 
     @Autowired
     private MockMvc mockMvc;

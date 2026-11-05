@@ -3,7 +3,7 @@ package com.kopach.logistics.order.repository;
 import com.kopach.logistics.auth.entity.Role;
 import com.kopach.logistics.auth.entity.User;
 import com.kopach.logistics.auth.repository.UserRepository;
-import com.kopach.logistics.config.PostgresTestContainer;
+import com.kopach.logistics.config.AbstractPostgresTest;
 import com.kopach.logistics.order.entity.Order;
 import com.kopach.logistics.order.entity.OrderStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.context.annotation.Import;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -20,9 +19,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
+// NONE: не подменять базу на встроенную H2, использовать PostgreSQL из AbstractPostgresTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(PostgresTestContainer.class)
-class OrderRepositoryTest {
+class OrderRepositoryTest extends AbstractPostgresTest {
 
     @Autowired
     private OrderRepository orderRepository;
