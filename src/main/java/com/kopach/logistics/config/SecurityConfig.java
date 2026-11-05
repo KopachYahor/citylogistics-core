@@ -3,6 +3,7 @@ package com.kopach.logistics.config;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -38,6 +39,14 @@ public class SecurityConfig {
                         // /error — внутренний адрес Spring, куда он перенаправляет запрос при ошибке.
                         // Если его закрыть, любая ошибка (400, 404, 500) превращается в 403.
                         .requestMatchers("/api/health", "/api/auth/register", "/api/auth/login", "/error").permitAll()
+                        // Роли проверяет бэкенд. Скрытые кнопки на фронтенде — не защита.
+                        // hasRole("CLIENT") ищет у пользователя право "ROLE_CLIENT" (см. User.getAuthorities).
+                        .requestMatchers(HttpMethod.POST, "/api/orders").hasRole("CLIENT")
+                        .requestMatchers(HttpMethod.GET, "/api/orders/my").hasRole("CLIENT")
+                        .requestMatchers(HttpMethod.PATCH, "/api/orders/*/cancel").hasRole("CLIENT")
+                        .requestMatchers(HttpMethod.GET, "/api/orders/assigned").hasRole("DRIVER")
+                        .requestMatchers(HttpMethod.PATCH, "/api/orders/*/status").hasRole("DRIVER")
+                        // всё остальное (например, /api/auth/me) — любой вошедший пользователь
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
