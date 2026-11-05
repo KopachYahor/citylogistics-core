@@ -1,6 +1,7 @@
 package com.kopach.logistics.order.service;
 
 import com.kopach.logistics.driver.dto.DriverAssignedEvent;
+import com.kopach.logistics.order.dto.OrderStatusChangedEvent;
 import com.kopach.logistics.order.entity.Order;
 import com.kopach.logistics.order.entity.OrderStatus;
 import com.kopach.logistics.order.repository.OrderRepository;
@@ -18,9 +19,11 @@ public class DriverAssignedListener {
     private static final Logger log = LoggerFactory.getLogger(DriverAssignedListener.class);
 
     private final OrderRepository orderRepository;
+    private final OrderEventPublisher eventPublisher;
 
-    public DriverAssignedListener(OrderRepository orderRepository) {
+    public DriverAssignedListener(OrderRepository orderRepository, OrderEventPublisher eventPublisher) {
         this.orderRepository = orderRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @KafkaListener(topics = "driver.assigned", groupId = "logistics-group")
@@ -32,6 +35,28 @@ public class DriverAssignedListener {
         Order order = orderRepository.findById(event.getOrderId())
                 .orElseThrow(() -> new IllegalStateException(
                         "Order not found: " + event.getOrderId()));
+
+        // Событие приходит асинхронно: пока driver-service искал водителя,
+        // заказ мог измениться. Принимаем водителя только для заказа в статусе NEW.
+        if (!order.getStatus().canTransitionTo(OrderStatus.ACCEPTED)) {
+            if (order.getStatus() == OrderStatus.CANCELLED) {
+                // Клиент отменил заказ раньше, чем пришло назначение. В событии об отмене
+                // driverId был null, поэтому driver-service не знал, кого освобождать.
+                // Сообщаем ещё раз, теперь с водителем, чтобы он не остался BUSY навсегда.
+                log.warn("Order {} was cancelled before driver {} was assigned, releasing driver",
+                        order.getId(), event.getDriverId());
+                eventPublisher.publishOrderStatusChanged(new OrderStatusChangedEvent(
+                        order.getId(),
+                        event.getDriverId(),
+                        OrderStatus.CANCELLED.name(),
+                        OrderStatus.CANCELLED.name()
+                ));
+            } else {
+                // Например, повторная доставка того же события (Kafka: at-least-once)
+                log.info("Order {} is already {}, ignoring driver.assigned", order.getId(), order.getStatus());
+            }
+            return;
+        }
 
         order.setDriverId(event.getDriverId());
         order.setStatus(OrderStatus.ACCEPTED);
