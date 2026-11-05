@@ -1,6 +1,10 @@
 package com.kopach.logistics.order.service;
 
+import com.kopach.logistics.auth.entity.Role;
+import com.kopach.logistics.auth.entity.User;
+import com.kopach.logistics.auth.repository.UserRepository;
 import com.kopach.logistics.common.ForbiddenException;
+import com.kopach.logistics.order.dto.OrderStatusChangedEvent;
 import com.kopach.logistics.common.NotFoundException;
 import com.kopach.logistics.order.dto.CreateOrderRequest;
 import com.kopach.logistics.order.dto.OrderResponse;
@@ -31,6 +35,9 @@ class OrderServiceTest {
 
     @Mock
     private OrderEventPublisher eventPublisher;
+
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private OrderService orderService;
@@ -134,5 +141,80 @@ class OrderServiceTest {
                 .hasMessageContaining("Cannot cancel order in status CANCELLED");
 
         verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    // ============ updateStatus — смена статуса водителем ============
+
+    @Test
+    void updateStatus_byAssignedDriver_shouldChangeStatusAndPublishEvent() {
+        // given: водитель 7 назначен на заказ в статусе ACCEPTED
+        when(userRepository.findById(10L)).thenReturn(Optional.of(driverUser(7L)));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(acceptedOrder(7L)));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        OrderResponse response = orderService.updateStatus(1L, OrderStatus.IN_TRANSIT, 10L);
+
+        // then
+        assertThat(response.getStatus()).isEqualTo(OrderStatus.IN_TRANSIT);
+        verify(eventPublisher).publishOrderStatusChanged(any(OrderStatusChangedEvent.class));
+    }
+
+    @Test
+    void updateStatus_byAnotherDriver_shouldThrowAccessDenied() {
+        // given: заказ назначен водителю 7, а меняет водитель 8
+        when(userRepository.findById(10L)).thenReturn(Optional.of(driverUser(8L)));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(acceptedOrder(7L)));
+
+        // when + then
+        assertThatThrownBy(() -> orderService.updateStatus(1L, OrderStatus.IN_TRANSIT, 10L))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("Access denied");
+
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(eventPublisher, never()).publishOrderStatusChanged(any());
+    }
+
+    @Test
+    void updateStatus_skippingSteps_shouldThrowAndNotSave() {
+        // given: ACCEPTED → DELIVERED (пропуск IN_TRANSIT и ARRIVED)
+        when(userRepository.findById(10L)).thenReturn(Optional.of(driverUser(7L)));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(acceptedOrder(7L)));
+
+        // when + then
+        assertThatThrownBy(() -> orderService.updateStatus(1L, OrderStatus.DELIVERED, 10L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Cannot transition from ACCEPTED to DELIVERED");
+
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    @Test
+    void updateStatus_byUserWithoutDriverProfile_shouldThrowForbidden() {
+        // given: у пользователя нет driverId
+        when(userRepository.findById(10L)).thenReturn(Optional.of(driverUser(null)));
+
+        // when + then
+        assertThatThrownBy(() -> orderService.updateStatus(1L, OrderStatus.IN_TRANSIT, 10L))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("User is not a driver");
+
+        verify(orderRepository, never()).findByIdForUpdate(any());
+    }
+
+    private User driverUser(Long driverId) {
+        User user = new User("driver@test.local", "hash", Role.DRIVER, LocalDateTime.now());
+        user.setId(10L);
+        user.setDriverId(driverId);
+        return user;
+    }
+
+    private Order acceptedOrder(Long driverId) {
+        Order order = new Order();
+        order.setId(1L);
+        order.setClientId(1L);
+        order.setDriverId(driverId);
+        order.setStatus(OrderStatus.ACCEPTED);
+        return order;
     }
 }
