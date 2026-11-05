@@ -1,16 +1,27 @@
 package com.kopach.logistics.order.dto;
 
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
+// Ограничения повторяют схему БД (V2__create_orders.sql): иначе слишком
+// длинное значение дошло бы до базы и вместо 400 клиент получил бы 500.
 public class CreateOrderRequest {
 
     @NotBlank
+    @Size(max = 500) // from_address VARCHAR(500)
     private String fromAddress;
 
     @NotBlank
+    @Size(max = 500) // to_address VARCHAR(500)
     private String toAddress;
 
+    @NotNull
+    @Positive
+    @Digits(integer = 8, fraction = 2) // price NUMERIC(10, 2): 8 цифр до запятой, 2 после
     private BigDecimal price;
 
     public CreateOrderRequest() {

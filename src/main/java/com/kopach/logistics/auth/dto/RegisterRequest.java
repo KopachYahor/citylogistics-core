@@ -1,6 +1,7 @@
 package com.kopach.logistics.auth.dto;
 
 import com.kopach.logistics.auth.entity.Role;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -16,8 +17,13 @@ public class RegisterRequest {
     private String password;
 
     @NotBlank
+    @Email
+    @Size(max = 255) // users.email VARCHAR(255)
     private String email;
 
+    // Обязателен только для DRIVER: эту проверку делает AuthService,
+    // потому что аннотация не знает, какая роль выбрана.
+    @Size(max = 50) // drivers.phone VARCHAR(50) в driver-service
     private String phone;
 
     @NotNull
