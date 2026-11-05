@@ -23,6 +23,10 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        # Если Kafka недоступна, send() по умолчанию ждёт брокер до 60 секунд, а запрос
+        # (и блокировка строки заказа в транзакции) висят всё это время. Ждём не больше 5 секунд.
+        max.block.ms: 5000
     consumer:
       group-id: logistics-group
       auto-offset-reset: earliest
