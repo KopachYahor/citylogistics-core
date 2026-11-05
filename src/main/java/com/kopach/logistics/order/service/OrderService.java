@@ -2,6 +2,8 @@ package com.kopach.logistics.order.service;
 
 import com.kopach.logistics.auth.entity.User;
 import com.kopach.logistics.auth.repository.UserRepository;
+import com.kopach.logistics.common.ForbiddenException;
+import com.kopach.logistics.common.NotFoundException;
 import com.kopach.logistics.order.dto.CreateOrderRequest;
 import com.kopach.logistics.order.dto.OrderCreatedEvent;
 import com.kopach.logistics.order.dto.OrderResponse;
@@ -64,7 +66,7 @@ public class OrderService {
 
     public List<OrderResponse> getAssignedOrders(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         if (user.getDriverId() == null) {
             return Collections.emptyList();
@@ -77,10 +79,10 @@ public class OrderService {
 
     public OrderResponse cancelOrder(Long orderId, Long clientId) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+                .orElseThrow(() -> new NotFoundException("Order not found"));
 
         if (!order.getClientId().equals(clientId)) {
-            throw new IllegalArgumentException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
         if (order.getStatus() != OrderStatus.NEW) {
             throw new IllegalArgumentException("Cannot cancel order in status " + order.getStatus());
@@ -104,17 +106,17 @@ public class OrderService {
 
     public OrderResponse updateStatus(Long orderId, OrderStatus newStatus, Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         if (user.getDriverId() == null) {
-            throw new IllegalArgumentException("User is not a driver");
+            throw new ForbiddenException("User is not a driver");
         }
 
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("Order not found"));
+                .orElseThrow(() -> new NotFoundException("Order not found"));
 
         if (!user.getDriverId().equals(order.getDriverId())) {
-            throw new IllegalArgumentException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
 
         OrderStatus oldStatus = order.getStatus();

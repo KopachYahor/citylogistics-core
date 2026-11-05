@@ -6,8 +6,10 @@ import com.kopach.logistics.auth.dto.RegisterRequest;
 import com.kopach.logistics.auth.entity.Role;
 import com.kopach.logistics.auth.entity.User;
 import com.kopach.logistics.auth.repository.UserRepository;
+import com.kopach.logistics.common.ServiceUnavailableException;
 import com.kopach.logistics.order.client.DriverServiceClient;
 import com.kopach.logistics.order.client.dto.DriverDto;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -53,9 +55,9 @@ public class AuthService {
                 user.setDriverId(driver.getId());
                 userRepository.save(user);
             } catch (Exception e) {
+                // компенсирующее действие: водителя создать не удалось — удаляем и пользователя
                 userRepository.delete(user);
-                throw new IllegalStateException(
-                        "Failed to create driver in driver-service: " + e.getMessage(), e);
+                throw new ServiceUnavailableException("Driver service is unavailable, try again later", e);
             }
         }
 
@@ -63,10 +65,12 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
+        // Одно и то же сообщение для «нет такого email» и «неверный пароль»:
+        // так нельзя узнать, зарегистрирован ли email.
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
+                .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new IllegalArgumentException("Invalid credentials");
+            throw new BadCredentialsException("Invalid credentials");
         }
         String token = jwtService.generateToken(user.getEmail());
         return new AuthResponse("Login successful", token);

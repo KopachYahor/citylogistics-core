@@ -1,5 +1,7 @@
 package com.kopach.logistics.order.service;
 
+import com.kopach.logistics.common.ForbiddenException;
+import com.kopach.logistics.common.NotFoundException;
 import com.kopach.logistics.order.dto.CreateOrderRequest;
 import com.kopach.logistics.order.dto.OrderResponse;
 import com.kopach.logistics.order.entity.Order;
@@ -98,7 +100,7 @@ class OrderServiceTest {
 
         // when + then
         assertThatThrownBy(() -> orderService.cancelOrder(999L, 1L))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(NotFoundException.class)
                 .hasMessage("Order not found");
 
         verify(orderRepository, never()).save(any(Order.class));
@@ -113,7 +115,7 @@ class OrderServiceTest {
 
         // when + then (clientId=999 — не владелец)
         assertThatThrownBy(() -> orderService.cancelOrder(1L, 999L))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ForbiddenException.class)
                 .hasMessage("Access denied");
 
         verify(orderRepository, never()).save(any(Order.class));
