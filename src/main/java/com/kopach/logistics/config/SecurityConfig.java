@@ -1,6 +1,7 @@
 package com.kopach.logistics.config;
 
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -84,6 +85,17 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
+    }
+
+    // JwtAuthenticationFilter помечен @Component, и Spring Boot автоматически регистрирует
+    // любой бин-фильтр ещё и в обычной цепочке сервлета — то есть фильтр стоял бы дважды.
+    // Выключаем эту автоматическую регистрацию: фильтр должен работать только внутри
+    // цепочки Spring Security (addFilterBefore выше).
+    @Bean
+    public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration(JwtAuthenticationFilter filter) {
+        FilterRegistrationBean<JwtAuthenticationFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean
