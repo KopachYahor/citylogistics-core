@@ -34,6 +34,12 @@ public class AuthService {
     }
 
     public AuthResponse register(RegisterRequest request) {
+        // Проверяем ДО сохранения: иначе User создастся, driver-service откажет
+        // (у него телефон обязателен), и пользователя придётся удалять.
+        if (request.getRole() == Role.DRIVER
+                && (request.getPhone() == null || request.getPhone().isBlank())) {
+            throw new IllegalArgumentException("phone: required for drivers");
+        }
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             throw new IllegalArgumentException("Email already registered");
         }
