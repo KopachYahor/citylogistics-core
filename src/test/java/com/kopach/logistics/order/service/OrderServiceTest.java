@@ -80,7 +80,7 @@ class OrderServiceTest {
     @Test
     void cancelOrder_whenNewOrder_shouldChangeStatusToCancelled() {
         // given
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(newOrder));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(newOrder));
         when(orderRepository.save(any(Order.class))).thenReturn(newOrder);
 
         // when
@@ -96,7 +96,7 @@ class OrderServiceTest {
     @Test
     void cancelOrder_whenOrderNotFound_shouldThrowException() {
         // given
-        when(orderRepository.findById(999L)).thenReturn(Optional.empty());
+        when(orderRepository.findByIdForUpdate(999L)).thenReturn(Optional.empty());
 
         // when + then
         assertThatThrownBy(() -> orderService.cancelOrder(999L, 1L))
@@ -111,7 +111,7 @@ class OrderServiceTest {
     @Test
     void cancelOrder_whenDifferentClient_shouldThrowAccessDenied() {
         // given
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(newOrder));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(newOrder));
 
         // when + then (clientId=999 — не владелец)
         assertThatThrownBy(() -> orderService.cancelOrder(1L, 999L))
@@ -126,7 +126,7 @@ class OrderServiceTest {
     @Test
     void cancelOrder_whenAlreadyCancelled_shouldThrowException() {
         // given
-        when(orderRepository.findById(2L)).thenReturn(Optional.of(cancelledOrder));
+        when(orderRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(cancelledOrder));
 
         // when + then
         assertThatThrownBy(() -> orderService.cancelOrder(2L, 1L))

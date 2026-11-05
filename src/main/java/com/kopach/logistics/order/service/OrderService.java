@@ -12,6 +12,7 @@ import com.kopach.logistics.order.entity.Order;
 import com.kopach.logistics.order.entity.OrderStatus;
 import com.kopach.logistics.order.repository.OrderRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -77,8 +78,13 @@ public class OrderService {
                 .toList();
     }
 
+    // @Transactional обязателен: блокировка строки из findByIdForUpdate
+    // держится ровно до конца транзакции (до выхода из метода).
+    @Transactional
     public OrderResponse cancelOrder(Long orderId, Long clientId) {
-        Order order = orderRepository.findById(orderId)
+        // Блокируем заказ: если в этот момент DriverAssignedListener назначает водителя,
+        // ждём его коммита и проверяем уже свежий статус, а не устаревший NEW.
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new NotFoundException("Order not found"));
 
         if (!order.getClientId().equals(clientId)) {
@@ -104,6 +110,7 @@ public class OrderService {
         return mapToResponse(updated);
     }
 
+    @Transactional
     public OrderResponse updateStatus(Long orderId, OrderStatus newStatus, Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found"));
@@ -112,7 +119,8 @@ public class OrderService {
             throw new ForbiddenException("User is not a driver");
         }
 
-        Order order = orderRepository.findById(orderId)
+        // Блокируем заказ, чтобы два одновременных запроса не прошли одну и ту же проверку перехода
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new NotFoundException("Order not found"));
 
         if (!user.getDriverId().equals(order.getDriverId())) {
