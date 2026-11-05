@@ -36,7 +36,9 @@ server:
   port: 8080
 
 jwt:
-  secret: bXktc3VwZXItc2VjcmV0LWtleS1mb3Itand0LXNpZ25pbmctbWluLTMyLWJ5dGVzLWxvbmc
+  # Секрет НЕ хранится в git. Задаётся переменной окружения JWT_SECRET
+  # (base64-строка, минимум 32 байта). Без неё приложение не стартует.
+  secret: ${JWT_SECRET}
   expiration: 86400000
 
 logging:
