@@ -6,6 +6,7 @@ import com.kopach.logistics.order.dto.OrderResponse;
 import com.kopach.logistics.order.dto.UpdateOrderStatusRequest;
 import com.kopach.logistics.order.service.OrderService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -26,7 +27,8 @@ public class OrderController {
     public ResponseEntity<OrderResponse> create(
             @RequestBody @Valid CreateOrderRequest request,
             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(orderService.createOrder(request, user.getId()));
+        // 201 Created: в результате запроса появился новый ресурс
+        return ResponseEntity.status(HttpStatus.CREATED).body(orderService.createOrder(request, user.getId()));
     }
 
     @GetMapping("/my")

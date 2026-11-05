@@ -22,8 +22,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * API-С‚РµСЃС‚С‹ СЂРµРіРёСЃС‚СЂР°С†РёРё, РІС…РѕРґР° Рё /me С‡РµСЂРµР· MockMvc.
- * Р‘Р°Р·Р° вЂ” РІСЂРµРјРµРЅРЅР°СЏ PostgreSQL РёР· AbstractPostgresTest, РїРѕСЌС‚РѕРјСѓ deleteAll() Р±РµР·РѕРїР°СЃРµРЅ.
+ * API-тесты регистрации, входа и /me через MockMvc.
+ * База — временная PostgreSQL из AbstractPostgresTest, поэтому deleteAll() безопасен.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -43,14 +43,14 @@ class AuthControllerTest extends AbstractPostgresTest {
 
     @BeforeEach
     void cleanUp() {
-        orderRepository.deleteAll();   // СЃРЅР°С‡Р°Р»Р° Р·Р°РєР°Р·С‹ (СЃСЃС‹Р»Р°СЋС‚СЃСЏ РЅР° users)
-        userRepository.deleteAll();    // РїРѕС‚РѕРј РїРѕР»СЊР·РѕРІР°С‚РµР»Рё
+        orderRepository.deleteAll();   // сначала заказы (ссылаются на users)
+        userRepository.deleteAll();    // потом пользователи
     }
 
     @Test
-    void register_withValidData_shouldReturn200AndMessage() throws Exception {
+    void register_withValidData_shouldReturn201AndMessage() throws Exception {
         register(client("test@example.com", "secret1"))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.message").value("Registered successfully"));
     }
 
@@ -69,7 +69,7 @@ class AuthControllerTest extends AbstractPostgresTest {
 
     @Test
     void register_withDuplicateEmail_shouldReturn400WithError() throws Exception {
-        register(client("dup@example.com", "secret1")).andExpect(status().isOk());
+        register(client("dup@example.com", "secret1")).andExpect(status().isCreated());
 
         register(client("dup@example.com", "secret1"))
                 .andExpect(status().isBadRequest())
@@ -78,7 +78,7 @@ class AuthControllerTest extends AbstractPostgresTest {
 
     @Test
     void login_withWrongPassword_shouldReturn401() throws Exception {
-        register(client("login@example.com", "secret1")).andExpect(status().isOk());
+        register(client("login@example.com", "secret1")).andExpect(status().isCreated());
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -96,7 +96,7 @@ class AuthControllerTest extends AbstractPostgresTest {
 
     @Test
     void me_withToken_shouldReturnUserWithoutPassword() throws Exception {
-        register(client("me@example.com", "secret1")).andExpect(status().isOk());
+        register(client("me@example.com", "secret1")).andExpect(status().isCreated());
 
         String loginJson = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -109,7 +109,7 @@ class AuthControllerTest extends AbstractPostgresTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("me@example.com"))
                 .andExpect(jsonPath("$.role").value("CLIENT"))
-                // DTO, Р° РЅРµ СЃСѓС‰РЅРѕСЃС‚СЊ: РЅРё С…РµС€Р° РїР°СЂРѕР»СЏ, РЅРё СЃР»СѓР¶РµР±РЅС‹С… РїРѕР»РµР№ Spring Security
+                // DTO, а не сущность: ни хеша пароля, ни служебных полей Spring Security
                 .andExpect(jsonPath("$.passwordHash").doesNotExist())
                 .andExpect(jsonPath("$.authorities").doesNotExist());
     }

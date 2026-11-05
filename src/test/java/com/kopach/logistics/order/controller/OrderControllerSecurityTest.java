@@ -71,7 +71,7 @@ class OrderControllerSecurityTest extends AbstractPostgresTest {
     void client_canCreateOrder() throws Exception {
         mockMvc.perform(post("/api/orders").header("Authorization", "Bearer " + clientToken)
                         .contentType(MediaType.APPLICATION_JSON).content(ORDER_JSON))
-                .andExpect(status().isOk());
+                .andExpect(status().isCreated());
     }
 
     @Test
