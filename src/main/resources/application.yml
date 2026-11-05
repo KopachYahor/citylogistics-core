@@ -54,3 +54,6 @@ logging:
 services:
   driver-service:
     url: http://localhost:8082
+    # Общий ключ для запросов к driver-service. НЕ хранится в git: задаётся переменной
+    # окружения INTERNAL_API_KEY, одинаковой у core и driver-service.
+    api-key: ${INTERNAL_API_KEY}
