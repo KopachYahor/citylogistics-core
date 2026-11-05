@@ -9,11 +9,13 @@ import com.kopach.logistics.auth.repository.UserRepository;
 import com.kopach.logistics.common.ServiceUnavailableException;
 import com.kopach.logistics.order.client.DriverServiceClient;
 import com.kopach.logistics.order.client.dto.DriverDto;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 @Service
 public class AuthService {
@@ -40,16 +42,23 @@ public class AuthService {
                 && (request.getPhone() == null || request.getPhone().isBlank())) {
             throw new IllegalArgumentException("phone: required for drivers");
         }
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        String email = normalizeEmail(request.getEmail());
+        if (userRepository.findByEmail(email).isPresent()) {
             throw new IllegalArgumentException("Email already registered");
         }
 
         User user = new User();
-        user.setEmail(request.getEmail());
+        user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setRole(request.getRole());
         user.setCreatedAt(LocalDateTime.now());
-        userRepository.save(user);
+        try {
+            userRepository.save(user);
+        } catch (DataIntegrityViolationException e) {
+            // Два одновременных запроса с одним email оба прошли проверку выше,
+            // второй упёрся в UNIQUE(email) в базе. Отвечаем так же, как на обычный дубль.
+            throw new IllegalArgumentException("Email already registered");
+        }
 
         if (request.getRole() == Role.DRIVER) {
             try {
@@ -73,12 +82,18 @@ public class AuthService {
     public AuthResponse login(LoginRequest request) {
         // Одно и то же сообщение для «нет такого email» и «неверный пароль»:
         // так нельзя узнать, зарегистрирован ли email.
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByEmail(normalizeEmail(request.getEmail()))
                 .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new BadCredentialsException("Invalid credentials");
         }
         String token = jwtService.generateToken(user.getEmail());
         return new AuthResponse("Login successful", token);
+    }
+
+    // Email не зависит от регистра: Ivan@Mail.by и ivan@mail.by — один и тот же адрес.
+    // Храним и ищем всегда в нижнем регистре, иначе получились бы два аккаунта.
+    private String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 }

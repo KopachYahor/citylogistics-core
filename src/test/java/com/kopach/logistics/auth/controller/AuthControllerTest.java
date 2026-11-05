@@ -22,8 +22,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * API-тесты регистрации, входа и /me через MockMvc.
- * База — временная PostgreSQL из AbstractPostgresTest, поэтому deleteAll() безопасен.
+ * API-С‚РµСЃС‚С‹ СЂРµРіРёСЃС‚СЂР°С†РёРё, РІС…РѕРґР° Рё /me С‡РµСЂРµР· MockMvc.
+ * Р‘Р°Р·Р° вЂ” РІСЂРµРјРµРЅРЅР°СЏ PostgreSQL РёР· AbstractPostgresTest, РїРѕСЌС‚РѕРјСѓ deleteAll() Р±РµР·РѕРїР°СЃРµРЅ.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -43,8 +43,8 @@ class AuthControllerTest extends AbstractPostgresTest {
 
     @BeforeEach
     void cleanUp() {
-        orderRepository.deleteAll();   // сначала заказы (ссылаются на users)
-        userRepository.deleteAll();    // потом пользователи
+        orderRepository.deleteAll();   // СЃРЅР°С‡Р°Р»Р° Р·Р°РєР°Р·С‹ (СЃСЃС‹Р»Р°СЋС‚СЃСЏ РЅР° users)
+        userRepository.deleteAll();    // РїРѕС‚РѕРј РїРѕР»СЊР·РѕРІР°С‚РµР»Рё
     }
 
     @Test
@@ -109,9 +109,25 @@ class AuthControllerTest extends AbstractPostgresTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("me@example.com"))
                 .andExpect(jsonPath("$.role").value("CLIENT"))
-                // DTO, а не сущность: ни хеша пароля, ни служебных полей Spring Security
+                // DTO, Р° РЅРµ СЃСѓС‰РЅРѕСЃС‚СЊ: РЅРё С…РµС€Р° РїР°СЂРѕР»СЏ, РЅРё СЃР»СѓР¶РµР±РЅС‹С… РїРѕР»РµР№ Spring Security
                 .andExpect(jsonPath("$.passwordHash").doesNotExist())
                 .andExpect(jsonPath("$.authorities").doesNotExist());
+    }
+
+    @Test
+    void email_shouldBeCaseInsensitive() throws Exception {
+        register(client("Case@Example.com", "secret1")).andExpect(status().isCreated());
+
+        // С‚РѕС‚ Р¶Рµ Р°РґСЂРµСЃ РІ РґСЂСѓРіРѕРј СЂРµРіРёСЃС‚СЂРµ вЂ” СЌС‚Рѕ РґСѓР±Р»СЊ
+        register(client("case@example.COM", "secret1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Email already registered"));
+
+        // Рё РІРѕР№С‚Рё РјРѕР¶РЅРѕ РІ Р»СЋР±РѕРј СЂРµРіРёСЃС‚СЂРµ
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LoginRequest("CASE@example.com", "secret1"))))
+                .andExpect(status().isOk());
     }
 
     private RegisterRequest client(String email, String password) {
