@@ -37,7 +37,8 @@ JUnit 5, Mockito, MockMvc, Testcontainers.
   `orders.driver_id` — это id водителя из другой базы, связь держит код, а не БД.
 - Фронтенд общается **только с core** по REST. Про Kafka он не знает.
 - Сервисы общаются через Kafka асинхронно. Синхронный REST-вызов один: при регистрации
-  водителя core создаёт его профиль в driver-service.
+  водителя core создаёт его профиль в driver-service. REST driver-service закрыт общим
+  ключом: core передаёт его в заголовке `X-Internal-Api-Key`.
 
 ### Kafka
 
@@ -109,25 +110,32 @@ NEW ──▶ ACCEPTED ──▶ IN_TRANSIT ──▶ ARRIVED ──▶ DELIVERE
    cd citylogistics-core
    docker compose up -d
    ```
-3. Задать секрет для подписи JWT. В git его нет, без него core не стартует.
-   Подойдёт любая base64-строка от 32 байт, например вывод `openssl rand -base64 48`.
+3. Придумать два секрета. В git их нет, без них сервисы не стартуют.
+   - `JWT_SECRET` — ключ подписи JWT (только для core): base64-строка от 32 байт.
+   - `INTERNAL_API_KEY` — общий ключ core и driver-service: **одинаковый** в обоих терминалах.
+
+   Сгенерировать случайную base64-строку в PowerShell:
    ```
-   $env:JWT_SECRET="<ваш_секрет>"
+   $b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)
    ```
-   В IntelliJ IDEA: Run Configuration → Environment variables → `JWT_SECRET=<ваш_секрет>`.
+   (или `openssl rand -base64 32`). В IntelliJ IDEA переменные задаются в
+   Run Configuration → Environment variables.
 4. Запустить core (порт 8080). Flyway сам применит миграции:
    ```
+   $env:JWT_SECRET="<секрет_jwt>"
+   $env:INTERNAL_API_KEY="<общий_ключ>"
    .\mvnw.cmd spring-boot:run
    ```
-5. В **другом** терминале запустить driver-service (порт 8082):
+5. В **другом** терминале запустить driver-service (порт 8082) с тем же общим ключом:
    ```
    cd ..\citylogistics-driver-service
+   $env:INTERNAL_API_KEY="<общий_ключ>"
    .\mvnw.cmd spring-boot:run
    ```
 6. Проверить: `http://localhost:8080/api/health` отвечает `{"status":"UP",...}`.
    Сообщения в Kafka видно в Kafka UI: `http://localhost:8090`.
 
-На macOS/Linux: `./mvnw` вместо `.\mvnw.cmd` и `export JWT_SECRET=...`.
+На macOS/Linux: `./mvnw` вместо `.\mvnw.cmd` и `export JWT_SECRET=...`, `export INTERNAL_API_KEY=...`.
 
 Остановить инфраструктуру: `docker compose down`. Данные баз сохранятся в volume.
 Чтобы начать с пустыми базами: `docker compose down -v` (**удалит все данные**).
@@ -161,7 +169,7 @@ curl localhost:8080/api/orders/my -H "Authorization: Bearer <token>"
 
 Нужен запущенный Docker. Тесты сами поднимают временную PostgreSQL (Testcontainers),
 поэтому **не трогают** базу из `docker-compose`, а Flyway каждый раз применяет все
-миграции на пустую базу. Kafka и `JWT_SECRET` для тестов не нужны.
+миграции на пустую базу. Kafka, `JWT_SECRET` и `INTERNAL_API_KEY` для тестов не нужны.
 
 | Вид | Классы | Что проверяют |
 |---|---|---|
@@ -186,6 +194,8 @@ curl localhost:8080/api/orders/my -H "Authorization: Bearer <token>"
   (таймаут 2 с на соединение, 5 с на ответ), пользователь удаляется, клиент получает 503.
   Это ручной откат, а не полноценная Saga (см. ограничения).
 - **Сущности наружу не отдаются.** Ответы — DTO (`OrderResponse`, `UserResponse`).
+- **Сервис-сервис по общему ключу.** driver-service отвечает на REST только с правильным
+  `X-Internal-Api-Key`, ключ приходит из переменной окружения `INTERNAL_API_KEY`.
 
 ## Известные ограничения
 
@@ -199,19 +209,21 @@ curl localhost:8080/api/orders/my -H "Authorization: Bearer <token>"
    ожидающие заказы никто не перепроверяет.
 3. **Откат при регистрации водителя не гарантирует согласованность.** Если driver-service
    создал водителя, но ответил позже таймаута, core удалит пользователя, а водитель
-   в driver-service останется «сиротой».
-4. **driver-service не защищён.** Его REST (8082) открыт без аутентификации: любой, у кого
-   есть доступ к порту, видит список водителей с телефонами и может создать водителя.
-   Подходит только для локальной разработки.
-5. **Идемпотентность `order.created` рассчитана на один экземпляр driver-service.**
-   Повтор события отсекает проверка `existsByOrderId`. Два экземпляра одновременно могут
-   её пройти, надёжная защита — `UNIQUE` на `order_assignments.order_id` (не добавлен).
-6. **DTO событий продублированы в обоих сервисах с одинаковыми пакетами.**
+   в driver-service останется «сиротой». И наоборот: если core упадёт между сохранением
+   пользователя и ответом driver-service, откат не выполнится, и в core останется
+   пользователь-водитель без `driverId`.
+4. **Защита driver-service простая.** Один общий ключ на всех: у него нет срока жизни и
+   ролей, при утечке его нужно сменить вручную в обоих сервисах. Для учебного проекта
+   хватает, в продакшене обычно используют токены сервисов (например, OAuth2 client
+   credentials) или mTLS.
+5. **DTO событий продублированы в обоих сервисах с одинаковыми пакетами.**
    `JsonSerializer` пишет полное имя класса в заголовок `__TypeId__`, и получатель ищет
    класс с тем же именем. Поэтому, например, `DriverAssignedEvent` в core лежит в папке
    `order/dto`, но объявлен в пакете `com.kopach.logistics.driver.dto`. Переименование
    пакета в одном сервисе ломает чтение событий в другом.
-7. **JWT нельзя отозвать.** Токен действует 24 часа. Выхода из системы на сервере нет.
-8. **Таблица `order_status_history` (миграция V3) создана, но не используется.**
-9. **CORS разрешён только для `http://localhost:5500` и `http://127.0.0.1:5500`** (в коде).
-10. **Пароли баз в `docker-compose.yml`** — это значения только для локальной разработки.
+6. **JWT нельзя отозвать.** Токен действует 24 часа. Выхода из системы на сервере нет.
+7. **CORS разрешён только для `http://localhost:5500` и `http://127.0.0.1:5500`** (в коде).
+8. **Пароли баз в `docker-compose.yml`** — это значения только для локальной разработки.
+9. **История миграций.** V3 создаёт таблицу `order_status_history`, которая так и не
+   понадобилась, V8 её удаляет. V4/V5 правились уже после применения (проект нигде
+   не развёрнут). Правило на будущее: применённую миграцию не меняют, пишут новую.
