@@ -32,7 +32,8 @@ public class DriverAssignedListener {
         log.info("Received driver.assigned: orderId={}, driverId={}",
                 event.getOrderId(), event.getDriverId());
 
-        Order order = orderRepository.findById(event.getOrderId())
+        // Блокируем заказ: если клиент в этот момент его отменяет, ждём и видим свежий статус
+        Order order = orderRepository.findByIdForUpdate(event.getOrderId())
                 .orElseThrow(() -> new IllegalStateException(
                         "Order not found: " + event.getOrderId()));
 
