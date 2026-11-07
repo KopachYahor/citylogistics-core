@@ -1,6 +1,11 @@
 spring:
   application:
     name: logistics-platform
+  config:
+    # Секреты для локального запуска можно положить в файл .env в корне проекта
+    # (образец — .env.example). Файла нет — не страшно (optional), тогда значения
+    # берутся из переменных окружения. .env в git не попадает (.gitignore).
+    import: optional:file:.env[.properties]
 
   datasource:
     url: jdbc:postgresql://localhost:5432/logistics
