@@ -111,32 +111,37 @@ NEW ──▶ ACCEPTED ──▶ IN_TRANSIT ──▶ ARRIVED ──▶ DELIVERE
    cd citylogistics-core
    docker compose up -d
    ```
-3. Придумать два секрета. В git их нет, без них сервисы не стартуют.
-   - `JWT_SECRET` — ключ подписи JWT (только для core): base64-строка от 32 байт.
-   - `INTERNAL_API_KEY` — общий ключ core и driver-service: **одинаковый** в обоих терминалах.
+3. Создать файлы с секретами (в git их нет, без них сервисы не стартуют). В каждом
+   репозитории скопировать образец `.env.example` в `.env`:
+   ```
+   copy .env.example .env
+   copy ..\citylogistics-driver-service\.env.example ..\citylogistics-driver-service\.env
+   ```
+   и вписать значения:
+   - `JWT_SECRET` — ключ подписи JWT (только в `.env` core);
+   - `INTERNAL_API_KEY` — общий ключ core и driver-service, **одинаковый** в обоих `.env`.
 
-   Сгенерировать случайную base64-строку в PowerShell:
+   Сгенерировать случайный ключ в PowerShell:
    ```
    $b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)
    ```
-   (или `openssl rand -base64 32`). В IntelliJ IDEA переменные задаются в
-   Run Configuration → Environment variables.
+   (или `openssl rand -base64 32`). Spring сам читает `.env` из папки, откуда запущен
+   сервис (`spring.config.import` в `application.yml`). Файл `.env` в `.gitignore`.
+   Вместо `.env` можно задать те же значения переменными окружения: они важнее файла.
 4. Запустить core (порт 8080). Flyway сам применит миграции:
    ```
-   $env:JWT_SECRET="<секрет_jwt>"
-   $env:INTERNAL_API_KEY="<общий_ключ>"
    .\mvnw.cmd spring-boot:run
    ```
-5. В **другом** терминале запустить driver-service (порт 8082) с тем же общим ключом:
+   Или из IntelliJ IDEA: запустить `LogisticsPlatformApplication` (рабочая папка — корень репозитория).
+5. В **другом** терминале запустить driver-service (порт 8082):
    ```
    cd ..\citylogistics-driver-service
-   $env:INTERNAL_API_KEY="<общий_ключ>"
    .\mvnw.cmd spring-boot:run
    ```
 6. Проверить: `http://localhost:8080/api/health` отвечает `{"status":"UP",...}`.
    Сообщения в Kafka видно в Kafka UI: `http://localhost:8090`.
 
-На macOS/Linux: `./mvnw` вместо `.\mvnw.cmd` и `export JWT_SECRET=...`, `export INTERNAL_API_KEY=...`.
+На macOS/Linux: `./mvnw` вместо `.\mvnw.cmd` и `cp` вместо `copy`.
 
 Если регистрация водителя возвращает `503`, проверьте, что driver-service запущен и что
 `INTERNAL_API_KEY` в обоих терминалах **одинаковый**: при разных ключах driver-service
