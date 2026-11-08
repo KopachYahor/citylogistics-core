@@ -8,8 +8,8 @@
 | Репозиторий | Что это | Порт |
 |---|---|---|
 | **citylogistics-core** (этот) | Пользователи, JWT, заказы | 8080, БД `logistics` на 5432 |
-| [citylogistics-driver-service](../citylogistics-driver-service) | Водители и их статусы | 8082, БД `drivers` на 5433 |
-| [citylogistics-frontend](../citylogistics-frontend) | HTML/CSS/Vanilla JS | 5500 |
+| [citylogistics-driver-service](https://github.com/KopachYahor/citylogistics-driver-service) | Водители и их статусы | 8082, БД `drivers` на 5433 |
+| [citylogistics-frontend](https://github.com/KopachYahor/citylogistics-frontend) | HTML/CSS/Vanilla JS | 5500 |
 
 Инфраструктура для всех сервисов описана в `docker-compose.yml` этого репозитория.
 
@@ -103,8 +103,8 @@ NEW ──▶ ACCEPTED ──▶ IN_TRANSIT ──▶ ARRIVED ──▶ DELIVERE
 
 1. Склонировать **оба** бэкенд-репозитория в одну папку, рядом друг с другом:
    ```
-   git clone <url>/citylogistics-core.git
-   git clone <url>/citylogistics-driver-service.git
+   git clone https://github.com/KopachYahor/citylogistics-core.git
+   git clone https://github.com/KopachYahor/citylogistics-driver-service.git
    ```
 2. Поднять инфраструктуру: 2 базы PostgreSQL, Kafka и Kafka UI.
    ```
@@ -143,8 +143,11 @@ NEW ──▶ ACCEPTED ──▶ IN_TRANSIT ──▶ ARRIVED ──▶ DELIVERE
 
 На macOS/Linux: `./mvnw` вместо `.\mvnw.cmd` и `cp` вместо `copy`.
 
+Если при старте core видите `WeakKeyException`, значит `JWT_SECRET` в `.env` пустой или слишком
+короткий: нужна base64-строка от 32 байт.
+
 Если регистрация водителя возвращает `503`, проверьте, что driver-service запущен и что
-`INTERNAL_API_KEY` в обоих терминалах **одинаковый**: при разных ключах driver-service
+`INTERNAL_API_KEY` в обоих `.env` **одинаковый**: при разных ключах driver-service
 отвечает `401`, а core показывает это как `503` (настоящая причина видна в логе core).
 
 Остановить инфраструктуру: `docker compose down`. Данные баз сохранятся в volume.
