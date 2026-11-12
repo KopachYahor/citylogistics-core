@@ -16,12 +16,11 @@ public class DriverServiceClient {
 
     private static final Logger log = LoggerFactory.getLogger(DriverServiceClient.class);
 
-    // Без таймаутов вызов ждёт ответа бесконечно: если driver-service завис,
-    // висит и регистрация, и поток сервера, который её обрабатывает.
-    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2); // установить соединение
-    private static final Duration READ_TIMEOUT = Duration.ofSeconds(5);    // дождаться ответа
+    // Без таймаутов зависший driver-service держал бы поток запроса бесконечно
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(5);
 
-    // driver-service пускает к своему REST только с этим заголовком (InternalApiKeyFilter там)
+    // Проверяется в driver-service (InternalApiKeyFilter)
     private static final String API_KEY_HEADER = "X-Internal-Api-Key";
 
     private final RestClient restClient;
@@ -35,7 +34,7 @@ public class DriverServiceClient {
         this.restClient = RestClient.builder()
                 .baseUrl(baseUrl)
                 .requestFactory(requestFactory)
-                .defaultHeader(API_KEY_HEADER, apiKey) // добавляется к каждому запросу
+                .defaultHeader(API_KEY_HEADER, apiKey)
                 .build();
         log.info("DriverServiceClient configured with base URL: {}", baseUrl);
     }

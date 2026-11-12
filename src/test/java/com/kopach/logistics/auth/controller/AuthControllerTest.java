@@ -21,10 +21,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * API-тесты регистрации, входа и /me через MockMvc.
- * База — временная PostgreSQL из AbstractPostgresTest, поэтому deleteAll() безопасен.
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 class AuthControllerTest extends AbstractPostgresTest {
@@ -44,7 +40,7 @@ class AuthControllerTest extends AbstractPostgresTest {
     @BeforeEach
     void cleanUp() {
         orderRepository.deleteAll();   // сначала заказы (ссылаются на users)
-        userRepository.deleteAll();    // потом пользователи
+        userRepository.deleteAll();
     }
 
     @Test
@@ -109,7 +105,7 @@ class AuthControllerTest extends AbstractPostgresTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("me@example.com"))
                 .andExpect(jsonPath("$.role").value("CLIENT"))
-                // DTO, а не сущность: ни хеша пароля, ни служебных полей Spring Security
+                // DTO, а не сущность
                 .andExpect(jsonPath("$.passwordHash").doesNotExist())
                 .andExpect(jsonPath("$.authorities").doesNotExist());
     }

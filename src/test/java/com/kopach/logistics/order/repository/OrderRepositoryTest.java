@@ -19,7 +19,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
-// NONE: не подменять базу на встроенную H2, использовать PostgreSQL из AbstractPostgresTest
+// не подменять PostgreSQL на H2
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class OrderRepositoryTest extends AbstractPostgresTest {
 

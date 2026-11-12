@@ -45,7 +45,6 @@ public class User implements UserDetails {
         this.createdAt = createdAt;
     }
 
-    // ============ UserDetails ============
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -85,7 +84,6 @@ public class User implements UserDetails {
         return true;
     }
 
-    // ============ Геттеры/сеттеры ============
 
     public Long getId() {
         return id;

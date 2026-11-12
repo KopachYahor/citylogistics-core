@@ -36,8 +36,7 @@ public class AuthService {
     }
 
     public AuthResponse register(RegisterRequest request) {
-        // Проверяем ДО сохранения: иначе User создастся, driver-service откажет
-        // (у него телефон обязателен), и пользователя придётся удалять.
+        // До сохранения: иначе пришлось бы удалять уже созданного User
         if (request.getRole() == Role.DRIVER
                 && (request.getPhone() == null || request.getPhone().isBlank())) {
             throw new IllegalArgumentException("phone: required for drivers");
@@ -55,8 +54,7 @@ public class AuthService {
         try {
             userRepository.save(user);
         } catch (DataIntegrityViolationException e) {
-            // Два одновременных запроса с одним email оба прошли проверку выше,
-            // второй упёрся в UNIQUE(email) в базе. Отвечаем так же, как на обычный дубль.
+            // Гонка: два запроса с одним email оба прошли проверку выше
             throw new IllegalArgumentException("Email already registered");
         }
 
@@ -80,8 +78,7 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        // Одно и то же сообщение для «нет такого email» и «неверный пароль»:
-        // так нельзя узнать, зарегистрирован ли email.
+        // Один ответ на оба случая: нельзя узнать, зарегистрирован ли email
         User user = userRepository.findByEmail(normalizeEmail(request.getEmail()))
                 .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
@@ -91,8 +88,7 @@ public class AuthService {
         return new AuthResponse("Login successful", token);
     }
 
-    // Email не зависит от регистра: Ivan@Mail.by и ivan@mail.by — один и тот же адрес.
-    // Храним и ищем всегда в нижнем регистре, иначе получились бы два аккаунта.
+    // Ivan@Mail.by и ivan@mail.by — один адрес
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
     }

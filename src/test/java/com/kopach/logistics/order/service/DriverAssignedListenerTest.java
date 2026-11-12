@@ -20,10 +20,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Unit-тесты слушателя driver.assigned. Kafka не нужна: метод слушателя —
- * обычный метод, в тесте мы вызываем его сами, как будто пришло событие.
- */
 @ExtendWith(MockitoExtension.class)
 class DriverAssignedListenerTest {
 

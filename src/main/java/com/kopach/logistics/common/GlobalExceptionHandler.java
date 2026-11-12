@@ -14,25 +14,17 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * Превращает исключения из контроллеров и сервисов в HTTP-ответ.
- * Формат тела всегда один: {"error": "текст"}.
- *
- * Исключения, которые здесь не перечислены, обрабатывает сам Spring Boot
- * (адрес /error): он вернёт правильный код и тоже поле "error".
- */
+// Исключения, которых здесь нет, обрабатывает Spring Boot (/error) — тоже с полем "error"
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    // 400: нарушено бизнес-правило (недопустимый переход статуса, email уже занят)
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleBadRequest(IllegalArgumentException ex) {
         return error(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
-    // 400: не прошла валидация @Valid (например, пустой адрес)
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult().getFieldErrors().stream()
@@ -41,37 +33,32 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, message);
     }
 
-    // 400: тело запроса не читается (битый JSON, статус "FOO" вместо значения enum)
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, String>> handleUnreadable(HttpMessageNotReadableException ex) {
         return error(HttpStatus.BAD_REQUEST, "Malformed request body");
     }
 
-    // 400: параметр в пути не того типа (/api/orders/abc/status)
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Map<String, String>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         return error(HttpStatus.BAD_REQUEST, "Invalid value for parameter '" + ex.getName() + "'");
     }
 
-    // 401: неверный email или пароль при входе
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Map<String, String>> handleBadCredentials(BadCredentialsException ex) {
         return error(HttpStatus.UNAUTHORIZED, ex.getMessage());
     }
 
-    // 403: пользователь известен, но действие ему запрещено
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<Map<String, String>> handleForbidden(ForbiddenException ex) {
         return error(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
-    // 404: объект не найден
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<Map<String, String>> handleNotFound(NotFoundException ex) {
         return error(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
-    // 503: не ответил другой сервис. Подробности пишем в лог, а не клиенту.
+    // Причину пишем в лог, а не клиенту
     @ExceptionHandler(ServiceUnavailableException.class)
     public ResponseEntity<Map<String, String>> handleUnavailable(ServiceUnavailableException ex) {
         log.error("{}: {}", ex.getMessage(), ex.getCause() != null ? ex.getCause().toString() : "-");

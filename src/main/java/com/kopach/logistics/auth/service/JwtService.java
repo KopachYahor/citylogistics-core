@@ -23,10 +23,6 @@ public class JwtService {
         this.expirationMs = expirationMs;
     }
 
-    /**
-     * Генерирует JWT-токен для пользователя.
-     * subject = email пользователя.
-     */
     public String generateToken(String email) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationMs);
@@ -39,16 +35,10 @@ public class JwtService {
                 .compact();
     }
 
-    /**
-     * Извлекает email (subject) из токена.
-     */
     public String extractEmail(String token) {
         return extractAllClaims(token).getSubject();
     }
 
-    /**
-     * Проверяет, что токен валиден: подпись корректна и не истёк.
-     */
     public boolean isTokenValid(String token, String email) {
         try {
             Claims claims = extractAllClaims(token);

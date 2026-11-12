@@ -2,9 +2,7 @@ spring:
   application:
     name: logistics-platform
   config:
-    # Секреты для локального запуска можно положить в файл .env в корне проекта
-    # (образец — .env.example). Файла нет — не страшно (optional), тогда значения
-    # берутся из переменных окружения. .env в git не попадает (.gitignore).
+    # Локальные секреты из .env (образец: .env.example). Переменные окружения важнее
     import: optional:file:.env[.properties]
 
   datasource:
@@ -29,16 +27,13 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
-        # Если Kafka недоступна, send() по умолчанию ждёт брокер до 60 секунд, а запрос
-        # (и блокировка строки заказа в транзакции) висят всё это время. Ждём не больше 5 секунд.
+        # По умолчанию send() ждёт брокер 60 с, держа запрос и блокировку строки
         max.block.ms: 5000
     consumer:
       group-id: logistics-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      # Обёртка над JsonDeserializer: если сообщение не разбирается (битый JSON),
-      # оно логируется и пропускается. Без неё консьюмер бесконечно спотыкается
-      # на этом сообщении, и все следующие события перестают обрабатываться.
+      # Битое сообщение логируется и пропускается, а не блокирует консьюмер
       value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
@@ -48,8 +43,7 @@ server:
   port: 8080
 
 jwt:
-  # Секрет НЕ хранится в git. Задаётся переменной окружения JWT_SECRET
-  # (base64-строка, минимум 32 байта). Без неё приложение не стартует.
+  # Из .env или переменной окружения, в git не хранится
   secret: ${JWT_SECRET}
   expiration: 86400000
 
@@ -59,10 +53,8 @@ logging:
     org.springframework.kafka: INFO
     org.springframework.security: INFO
 
-# Адрес driver-service для REST-вызова при регистрации водителя (DriverServiceClient)
 services:
   driver-service:
     url: http://localhost:8082
-    # Общий ключ для запросов к driver-service. НЕ хранится в git: задаётся переменной
-    # окружения INTERNAL_API_KEY, одинаковой у core и driver-service.
+    # Общий ключ с driver-service, в git не хранится
     api-key: ${INTERNAL_API_KEY}

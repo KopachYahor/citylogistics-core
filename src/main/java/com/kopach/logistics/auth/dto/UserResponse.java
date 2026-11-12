@@ -3,10 +3,7 @@ package com.kopach.logistics.auth.dto;
 import com.kopach.logistics.auth.entity.Role;
 import com.kopach.logistics.auth.entity.User;
 
-/**
- * Что отдаём клиенту о текущем пользователе (GET /api/auth/me).
- * Сущность User наружу не отдаём: в ней хеш пароля и служебные поля Spring Security.
- */
+// Сущность User наружу не отдаём: в ней хеш пароля и служебные поля Spring Security
 public class UserResponse {
 
     private final Long id;

@@ -27,7 +27,6 @@ public class OrderController {
     public ResponseEntity<OrderResponse> create(
             @RequestBody @Valid CreateOrderRequest request,
             @AuthenticationPrincipal User user) {
-        // 201 Created: в результате запроса появился новый ресурс
         return ResponseEntity.status(HttpStatus.CREATED).body(orderService.createOrder(request, user.getId()));
     }
 

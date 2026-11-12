@@ -28,7 +28,6 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@RequestBody @Valid RegisterRequest request) {
-        // 201 Created: создан новый пользователь
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
     }
 
@@ -37,8 +36,7 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(request));
     }
 
-    // Без токена сюда не попасть: SecurityConfig сам вернёт 401,
-    // поэтому user здесь всегда не null.
+    // user не null: без токена SecurityConfig раньше ответит 401
     @GetMapping("/me")
     public ResponseEntity<UserResponse> me(@AuthenticationPrincipal User user) {
         return ResponseEntity.ok(UserResponse.from(user));
