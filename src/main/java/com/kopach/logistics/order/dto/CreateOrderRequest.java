@@ -7,8 +7,7 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
-// Ограничения повторяют схему БД (V2__create_orders.sql): иначе слишком
-// длинное значение дошло бы до базы и вместо 400 клиент получил бы 500.
+// Лимиты повторяют схему БД: иначе длинное значение дало бы 500 вместо 400
 public class CreateOrderRequest {
 
     @NotBlank

@@ -23,10 +23,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * API-тесты прав доступа: бэкенд сам отказывает клиенту в водительских
- * эндпоинтах и водителю в клиентских (SecurityConfig, hasRole).
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 class OrderControllerSecurityTest extends AbstractPostgresTest {
@@ -46,7 +42,7 @@ class OrderControllerSecurityTest extends AbstractPostgresTest {
     @Autowired
     private JwtService jwtService;
 
-    // Подменяем отправку в Kafka: в этом тесте проверяем только права, брокер не нужен
+    // Kafka здесь не нужна
     @MockBean
     private OrderEventPublisher eventPublisher;
 

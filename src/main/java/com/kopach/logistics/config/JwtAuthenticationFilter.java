@@ -36,7 +36,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         final String authHeader = request.getHeader("Authorization");
 
-        // Если нет заголовка или он не начинается с "Bearer" — пропускаем запрос дальше
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
@@ -46,7 +45,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             final String userEmail = jwtService.extractEmail(jwt);
 
-            // Если email есть и пользователь ещё не аутентифицирован
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
 
@@ -61,8 +59,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
         } catch (Exception e) {
-            // Токен битый/истёкший — не аутентифицируем, но пропускаем дальше.
-            // Security сам вернёт 401, если endpoint требует аутентификации.
+            // Неверный токен: не аутентифицируем, защищённый адрес ответит 401
             logger.debug("JWT validation failed: " + e.getMessage());
         }
 

@@ -16,12 +16,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     List<Order> findByDriverId(Long driverId);
 
-    /**
-     * Читает заказ и блокирует его строку до конца транзакции (SELECT ... FOR UPDATE).
-     * Если строку уже держит другая транзакция, этот вызов ждёт её коммита
-     * и потом читает уже новые данные. Так две операции не затрут друг друга.
-     * Работает только внутри @Transactional: без транзакции блокировка сразу снимается.
-     */
+    // SELECT ... FOR UPDATE: вторая транзакция ждёт коммита первой.
+    // Работает только внутри @Transactional.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from Order o where o.id = :id")
     Optional<Order> findByIdForUpdate(@Param("id") Long id);

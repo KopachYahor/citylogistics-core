@@ -32,18 +32,15 @@ public class DriverAssignedListener {
         log.info("Received driver.assigned: orderId={}, driverId={}",
                 event.getOrderId(), event.getDriverId());
 
-        // Блокируем заказ: если клиент в этот момент его отменяет, ждём и видим свежий статус
+        // Отмена заказа клиентом в этот момент подождёт коммита
         Order order = orderRepository.findByIdForUpdate(event.getOrderId())
                 .orElseThrow(() -> new IllegalStateException(
                         "Order not found: " + event.getOrderId()));
 
-        // Событие приходит асинхронно: пока driver-service искал водителя,
-        // заказ мог измениться. Принимаем водителя только для заказа в статусе NEW.
+        // Событие асинхронное: заказ мог уже измениться
         if (!order.getStatus().canTransitionTo(OrderStatus.ACCEPTED)) {
             if (order.getStatus() == OrderStatus.CANCELLED) {
-                // Клиент отменил заказ раньше, чем пришло назначение. В событии об отмене
-                // driverId был null, поэтому driver-service не знал, кого освобождать.
-                // Сообщаем ещё раз, теперь с водителем, чтобы он не остался BUSY навсегда.
+                // В событии отмены driverId был null: повторяем его с водителем, иначе тот останется BUSY
                 log.warn("Order {} was cancelled before driver {} was assigned, releasing driver",
                         order.getId(), event.getDriverId());
                 eventPublisher.publishOrderStatusChanged(new OrderStatusChangedEvent(
@@ -53,7 +50,7 @@ public class DriverAssignedListener {
                         OrderStatus.CANCELLED.name()
                 ));
             } else {
-                // Например, повторная доставка того же события (Kafka: at-least-once)
+                // например, повторная доставка (at-least-once)
                 log.info("Order {} is already {}, ignoring driver.assigned", order.getId(), order.getStatus());
             }
             return;

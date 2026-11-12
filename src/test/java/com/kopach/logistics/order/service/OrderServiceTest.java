@@ -63,7 +63,6 @@ class OrderServiceTest {
         cancelledOrder.setStatus(OrderStatus.CANCELLED);
     }
 
-    // ============ createOrder ============
 
     @Test
     void createOrder_shouldSaveAndPublishEvent() {
@@ -82,7 +81,6 @@ class OrderServiceTest {
         verify(orderRepository, times(1)).save(any(Order.class));
         verify(eventPublisher, times(1)).publishOrderCreated(any(OrderCreatedEvent.class));    }
 
-    // ============ cancelOrder — успешная отмена ============
 
     @Test
     void cancelOrder_whenNewOrder_shouldChangeStatusToCancelled() {
@@ -98,7 +96,6 @@ class OrderServiceTest {
         verify(orderRepository, times(1)).save(any(Order.class));
     }
 
-    // ============ cancelOrder — заказ не найден ============
 
     @Test
     void cancelOrder_whenOrderNotFound_shouldThrowException() {
@@ -113,7 +110,6 @@ class OrderServiceTest {
         verify(orderRepository, never()).save(any(Order.class));
     }
 
-    // ============ cancelOrder — чужой заказ ============
 
     @Test
     void cancelOrder_whenDifferentClient_shouldThrowAccessDenied() {
@@ -128,7 +124,6 @@ class OrderServiceTest {
         verify(orderRepository, never()).save(any(Order.class));
     }
 
-    // ============ cancelOrder — уже отменён ============
 
     @Test
     void cancelOrder_whenAlreadyCancelled_shouldThrowException() {
@@ -143,7 +138,6 @@ class OrderServiceTest {
         verify(orderRepository, never()).save(any(Order.class));
     }
 
-    // ============ updateStatus — смена статуса водителем ============
 
     @Test
     void updateStatus_byAssignedDriver_shouldChangeStatusAndPublishEvent() {

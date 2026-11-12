@@ -78,12 +78,10 @@ public class OrderService {
                 .toList();
     }
 
-    // @Transactional обязателен: блокировка строки из findByIdForUpdate
-    // держится ровно до конца транзакции (до выхода из метода).
+    // Блокировка из findByIdForUpdate держится до конца транзакции
     @Transactional
     public OrderResponse cancelOrder(Long orderId, Long clientId) {
-        // Блокируем заказ: если в этот момент DriverAssignedListener назначает водителя,
-        // ждём его коммита и проверяем уже свежий статус, а не устаревший NEW.
+        // Если DriverAssignedListener сейчас меняет заказ, ждём его коммита
         Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new NotFoundException("Order not found"));
 
@@ -99,7 +97,6 @@ public class OrderService {
         order.setUpdatedAt(LocalDateTime.now());
         Order updated = orderRepository.save(order);
 
-        // статус изменился — публикуем событие
         eventPublisher.publishOrderStatusChanged(new OrderStatusChangedEvent(
                 updated.getId(),
                 updated.getDriverId(),
@@ -119,7 +116,7 @@ public class OrderService {
             throw new ForbiddenException("User is not a driver");
         }
 
-        // Блокируем заказ, чтобы два одновременных запроса не прошли одну и ту же проверку перехода
+        // Два одновременных запроса не пройдут одну и ту же проверку перехода
         Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new NotFoundException("Order not found"));
 

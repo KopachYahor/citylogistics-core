@@ -4,9 +4,6 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Unit-тесты конечного автомата статусов: Spring и база не нужны, это обычный enum.
- */
 class OrderStatusTest {
 
     @Test

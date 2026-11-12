@@ -21,8 +21,7 @@ public class RegisterRequest {
     @Size(max = 255) // users.email VARCHAR(255)
     private String email;
 
-    // Обязателен только для DRIVER: эту проверку делает AuthService,
-    // потому что аннотация не знает, какая роль выбрана.
+    // Обязателен только для DRIVER: проверяется в AuthService
     @Size(max = 50) // drivers.phone VARCHAR(50) в driver-service
     private String phone;
 

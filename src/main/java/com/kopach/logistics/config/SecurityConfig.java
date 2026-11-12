@@ -37,24 +37,19 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // /error — внутренний адрес Spring, куда он перенаправляет запрос при ошибке.
-                        // Если его закрыть, любая ошибка (400, 404, 500) превращается в 403.
+                        // /error открыт: иначе любая ошибка превращается в 403
                         .requestMatchers("/api/health", "/api/auth/register", "/api/auth/login", "/error").permitAll()
-                        // Роли проверяет бэкенд. Скрытые кнопки на фронтенде — не защита.
-                        // hasRole("CLIENT") ищет у пользователя право "ROLE_CLIENT" (см. User.getAuthorities).
+                        // hasRole("CLIENT") проверяет право ROLE_CLIENT
                         .requestMatchers(HttpMethod.POST, "/api/orders").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.GET, "/api/orders/my").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.PATCH, "/api/orders/*/cancel").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.GET, "/api/orders/assigned").hasRole("DRIVER")
                         .requestMatchers(HttpMethod.PATCH, "/api/orders/*/status").hasRole("DRIVER")
-                        // всё остальное (например, /api/auth/me) — любой вошедший пользователь
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
-                        // нет токена или токен неверный → 401 (кто ты?)
                         .authenticationEntryPoint((request, response, e) ->
                                 writeError(response, HttpStatus.UNAUTHORIZED, "Unauthorized"))
-                        // токен есть, но прав не хватает → 403 (тебе нельзя)
                         .accessDeniedHandler((request, response, e) ->
                                 writeError(response, HttpStatus.FORBIDDEN, "Access denied"))
                 )
@@ -63,8 +58,7 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // Ошибки из фильтров Security не доходят до GlobalExceptionHandler,
-    // поэтому тело ответа в том же формате {"error": "..."} пишем вручную.
+    // Ошибки фильтров Security не доходят до GlobalExceptionHandler
     private void writeError(HttpServletResponse response, HttpStatus status, String message) throws IOException {
         response.setStatus(status.value());
         response.setContentType("application/json;charset=UTF-8");
@@ -87,10 +81,7 @@ public class SecurityConfig {
         return source;
     }
 
-    // JwtAuthenticationFilter помечен @Component, и Spring Boot автоматически регистрирует
-    // любой бин-фильтр ещё и в обычной цепочке сервлета — то есть фильтр стоял бы дважды.
-    // Выключаем эту автоматическую регистрацию: фильтр должен работать только внутри
-    // цепочки Spring Security (addFilterBefore выше).
+    // Иначе Spring Boot зарегистрирует фильтр-бин второй раз, вне цепочки Security
     @Bean
     public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration(JwtAuthenticationFilter filter) {
         FilterRegistrationBean<JwtAuthenticationFilter> registration = new FilterRegistrationBean<>(filter);
