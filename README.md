@@ -79,7 +79,7 @@ NEW ──▶ ACCEPTED ──▶ IN_TRANSIT ──▶ ARRIVED ──▶ DELIVERE
 | `POST /api/auth/register` | все | Регистрация (ответ `201`). Тело: `name`, `email`, `password`, `role` (`CLIENT` / `DRIVER`), `phone` (обязателен для `DRIVER`). Email хранится в нижнем регистре |
 | `POST /api/auth/login` | все | Вход по `email` и `password`, в ответе `token` |
 | `GET /api/auth/me` | любой вошедший | Текущий пользователь: `id`, `email`, `role`, `driverId` |
-| `GET /api/health` | все | Проверка, что сервис жив |
+| `GET /actuator/health` | все | Spring Boot Actuator: `UP`, если приложение и БД доступны, иначе `DOWN` и 503 |
 | `POST /api/orders` | `CLIENT` | Создать заказ (ответ `201`): `fromAddress`, `toAddress`, `price` |
 | `GET /api/orders/my` | `CLIENT` | Мои заказы |
 | `PATCH /api/orders/{id}/cancel` | `CLIENT`, владелец | Отменить заказ (только `NEW`) |
@@ -138,7 +138,7 @@ NEW ──▶ ACCEPTED ──▶ IN_TRANSIT ──▶ ARRIVED ──▶ DELIVERE
    cd ..\citylogistics-driver-service
    .\mvnw.cmd spring-boot:run
    ```
-6. Проверить: `http://localhost:8080/api/health` отвечает `{"status":"UP",...}`.
+6. Проверить: `http://localhost:8080/actuator/health` отвечает `{"status":"UP"}`.
    Сообщения в Kafka видно в Kafka UI: `http://localhost:8090`.
 
 На macOS/Linux: `./mvnw` вместо `.\mvnw.cmd` и `cp` вместо `copy`.
@@ -187,7 +187,7 @@ curl localhost:8080/api/orders/my -H "Authorization: Bearer <token>"
 | Вид | Классы | Что проверяют |
 |---|---|---|
 | Unit (Mockito) | `OrderServiceTest`, `DriverAssignedListenerTest`, `OrderStatusTest` | Бизнес-правила: переходы статусов, владелец и водитель заказа, обработка `driver.assigned` |
-| API (MockMvc) | `AuthControllerTest`, `OrderControllerSecurityTest`, `HealthControllerTest` | Коды ответов, валидация, 401/403, права по ролям |
+| API (MockMvc) | `AuthControllerTest`, `OrderControllerSecurityTest`, `HealthEndpointTest` | Коды ответов, валидация, 401/403, права по ролям |
 | Интеграционный (Testcontainers) | `OrderRepositoryTest` | Репозиторий на настоящей PostgreSQL |
 
 ## Ключевые решения

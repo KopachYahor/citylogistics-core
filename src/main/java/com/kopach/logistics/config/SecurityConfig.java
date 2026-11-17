@@ -38,7 +38,7 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // /error открыт: иначе любая ошибка превращается в 403
-                        .requestMatchers("/api/health", "/api/auth/register", "/api/auth/login", "/error").permitAll()
+                        .requestMatchers("/actuator/health", "/api/auth/register", "/api/auth/login", "/error").permitAll()
                         // hasRole("CLIENT") проверяет право ROLE_CLIENT
                         .requestMatchers(HttpMethod.POST, "/api/orders").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.GET, "/api/orders/my").hasRole("CLIENT")

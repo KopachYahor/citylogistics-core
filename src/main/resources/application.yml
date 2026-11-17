@@ -42,6 +42,17 @@ spring:
 server:
   port: 8080
 
+management:
+  endpoints:
+    web:
+      exposure:
+        # Наружу только health: остальные эндпоинты Actuator раскрывают конфигурацию
+        include: health
+  endpoint:
+    health:
+      # Только UP/DOWN, без деталей о БД и диске
+      show-details: never
+
 jwt:
   # Из .env или переменной окружения, в git не хранится
   secret: ${JWT_SECRET}

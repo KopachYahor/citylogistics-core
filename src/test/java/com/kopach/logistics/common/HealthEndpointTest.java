@@ -13,16 +13,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-class HealthControllerTest extends AbstractPostgresTest {
+class HealthEndpointTest extends AbstractPostgresTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @Test
-    void health_shouldReturn200WithStatusUp() throws Exception {
-        mockMvc.perform(get("/api/health"))
+    void health_withoutToken_shouldReturnUpWithoutDetails() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UP"))
-                .andExpect(jsonPath("$.service").value("logistics-platform"));
+                .andExpect(jsonPath("$.components").doesNotExist());
     }
 }
