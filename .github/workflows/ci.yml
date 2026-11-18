@@ -1,0 +1,30 @@
+# CI: на каждый push в main и на каждый pull request собираем проект и гоняем все тесты.
+# Testcontainers сам поднимает PostgreSQL в Docker, Docker на раннерах GitHub уже есть.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven # кэш ~/.m2, чтобы не качать зависимости каждый раз
+
+      - name: Run tests
+        # mvnw закоммичен с Windows без права на запуск, поэтому chmod
+        run: |
+          chmod +x mvnw
+          ./mvnw -B test
