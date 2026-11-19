@@ -1,0 +1,9 @@
+# Не отправлять в сборку Docker: лишнее и секреты
+target/
+.git/
+.idea/
+.vscode/
+*.iml
+.env
+.env.*
+postman/

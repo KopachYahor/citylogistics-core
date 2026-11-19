@@ -99,47 +99,71 @@ NEW ──▶ ACCEPTED ──▶ IN_TRANSIT ──▶ ARRIVED ──▶ DELIVERE
 
 ## Запуск с нуля
 
-Нужно: **JDK 21** и **Docker Desktop** (запущенный). Примеры команд — для PowerShell на Windows.
+Нужен только **Docker Desktop** (запущенный). Примеры команд — для PowerShell на Windows.
 
-1. Склонировать **оба** бэкенд-репозитория в одну папку, рядом друг с другом:
+1. Склонировать **оба** бэкенд-репозитория в одну папку, рядом друг с другом
+   (compose собирает driver-service из соседней папки `../citylogistics-driver-service`):
    ```
    git clone https://github.com/KopachYahor/citylogistics-core.git
    git clone https://github.com/KopachYahor/citylogistics-driver-service.git
-   ```
-2. Поднять инфраструктуру: 2 базы PostgreSQL, Kafka и Kafka UI.
-   ```
    cd citylogistics-core
-   docker compose up -d
    ```
-3. Создать файлы с секретами (в git их нет, без них сервисы не стартуют). В каждом
-   репозитории скопировать образец `.env.example` в `.env`:
+2. Создать файл с секретами (в git его нет, без него сервисы не стартуют):
    ```
    copy .env.example .env
-   copy ..\citylogistics-driver-service\.env.example ..\citylogistics-driver-service\.env
    ```
    и вписать значения:
-   - `JWT_SECRET` — ключ подписи JWT (только в `.env` core);
-   - `INTERNAL_API_KEY` — общий ключ core и driver-service, **одинаковый** в обоих `.env`.
+   - `JWT_SECRET` — ключ подписи JWT;
+   - `INTERNAL_API_KEY` — общий ключ core и driver-service.
 
    Сгенерировать случайный ключ в PowerShell:
    ```
    $b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)
    ```
-   (или `openssl rand -base64 32`). Spring сам читает `.env` из папки, откуда запущен
-   сервис (`spring.config.import` в `application.yml`). Файл `.env` в `.gitignore`.
-   Вместо `.env` можно задать те же значения переменными окружения: они важнее файла.
-4. Запустить core (порт 8080). Flyway сам применит миграции:
+   (или `openssl rand -base64 32`). Docker Compose сам читает `.env` рядом с `docker-compose.yml`
+   и передаёт ключи обоим сервисам, поэтому `INTERNAL_API_KEY` у них гарантированно одинаковый.
+3. Собрать образы сервисов и поднять всё: 2 базы PostgreSQL, Kafka, Kafka UI, core и driver-service.
    ```
-   .\mvnw.cmd spring-boot:run
+   docker compose up -d --build
    ```
-   Или из IntelliJ IDEA: запустить `LogisticsPlatformApplication` (рабочая папка — корень репозитория).
-5. В **другом** терминале запустить driver-service (порт 8082):
+   Первая сборка идёт несколько минут: скачиваются образы и зависимости Maven. Сервисы стартуют
+   только после того, как базы и Kafka станут готовы (`depends_on` + `healthcheck`).
+   Flyway сам применит миграции.
+4. Проверить: `docker compose ps` показывает `healthy` у всех, кроме Kafka UI;
+   `http://localhost:8080/actuator/health` отвечает `{"status":"UP"}`.
+   Сообщения в Kafka видно в Kafka UI: `http://localhost:8090`. Логи сервиса: `docker compose logs -f core`.
+
+### Как устроен запуск в Docker
+
+- **Dockerfile** в каждом сервисе двухэтапный: на первом этапе образ с Maven собирает jar
+  (тесты при этом не запускаются, им нужен Docker), на втором jar кладётся в лёгкий образ
+  только с JRE и запускается не от root.
+- **Адреса внутри Docker другие.** В контейнере `localhost` — это сам контейнер, а соседи доступны
+  по имени сервиса: `postgres:5432`, `kafka:9092`, `driver-service:8082`. В `application.yml`
+  остаются адреса для запуска из IDE (`localhost`), а в `docker-compose.yml` они заменяются
+  переменными окружения (`SPRING_DATASOURCE_URL` и т.п.): переменные окружения важнее `application.yml`.
+- **У Kafka два listener'а:** `kafka:9092` для контейнеров и `localhost:29092` для приложений на хосте.
+
+### Разработка: сервисы из IDE, инфраструктура в Docker
+
+Нужен ещё **JDK 21**.
+
+1. Поднять только инфраструктуру:
+   ```
+   docker compose up -d postgres postgres-drivers kafka kafka-ui
+   ```
+   Если перед этим всё было запущено целиком, сначала остановите контейнеры сервисов, иначе
+   порты 8080 и 8082 будут заняты: `docker compose stop core driver-service`.
+2. Скопировать `.env.example` в `.env` и в репозитории driver-service, вписать тот же
+   `INTERNAL_API_KEY`. Spring сам читает `.env` из папки, откуда запущен сервис
+   (`spring.config.import` в `application.yml`).
+3. Запустить core (порт 8080): `.\mvnw.cmd spring-boot:run` или `LogisticsPlatformApplication`
+   в IntelliJ IDEA (рабочая папка — корень репозитория).
+4. В **другом** терминале запустить driver-service (порт 8082):
    ```
    cd ..\citylogistics-driver-service
    .\mvnw.cmd spring-boot:run
    ```
-6. Проверить: `http://localhost:8080/actuator/health` отвечает `{"status":"UP"}`.
-   Сообщения в Kafka видно в Kafka UI: `http://localhost:8090`.
 
 На macOS/Linux: `./mvnw` вместо `.\mvnw.cmd` и `cp` вместо `copy`.
 
@@ -147,10 +171,10 @@ NEW ──▶ ACCEPTED ──▶ IN_TRANSIT ──▶ ARRIVED ──▶ DELIVERE
 короткий: нужна base64-строка от 32 байт.
 
 Если регистрация водителя возвращает `503`, проверьте, что driver-service запущен и что
-`INTERNAL_API_KEY` в обоих `.env` **одинаковый**: при разных ключах driver-service
+`INTERNAL_API_KEY` у core и driver-service **одинаковый**: при разных ключах driver-service
 отвечает `401`, а core показывает это как `503` (настоящая причина видна в логе core).
 
-Остановить инфраструктуру: `docker compose down`. Данные баз сохранятся в volume.
+Остановить всё: `docker compose down`. Данные баз сохранятся в volume.
 Чтобы начать с пустыми базами: `docker compose down -v` (**удалит все данные**).
 
 ### Быстрая проверка через curl

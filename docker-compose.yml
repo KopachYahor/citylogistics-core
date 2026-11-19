@@ -1,3 +1,8 @@
+# Весь проект одной командой: docker compose up --build
+# Только инфраструктура (сервисы запускаются из IDE):
+#   docker compose up -d postgres postgres-drivers kafka kafka-ui
+# Секреты (JWT_SECRET, INTERNAL_API_KEY) Compose берёт из файла .env рядом с этим файлом.
+
 services:
   postgres:
     image: postgres:15
@@ -11,6 +16,12 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
+    # healthy = база принимает подключения. По этому статусу ждёт core
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U logistics -d logistics"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   postgres-drivers:
     image: postgres:15
@@ -24,6 +35,11 @@ services:
     volumes:
       - drivers_data:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U drivers -d drivers"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   kafka:
     image: confluentinc/cp-kafka:7.6.0
@@ -33,6 +49,7 @@ services:
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
+      # 9092 — для контейнеров (kafka:9092), 29092 — для приложений на хосте (localhost:29092)
       KAFKA_LISTENERS: PLAINTEXT_INTERNAL://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_INTERNAL://kafka:9092,PLAINTEXT_HOST://localhost:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
@@ -41,6 +58,13 @@ services:
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    # healthy = брокер отвечает на запрос версий API
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 15s
 
   kafka-ui:
     image: provectuslabs/kafka-ui:v0.7.2
@@ -51,7 +75,56 @@ services:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
+
+  core:
+    build: .
+    container_name: logistics-core
+    ports:
+      - "8080:8080"
+    # Внутри контейнера localhost — это сам контейнер, поэтому адреса другие, чем в application.yml.
+    # Переменные окружения важнее application.yml: SPRING_DATASOURCE_URL заменяет spring.datasource.url
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/logistics
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SERVICES_DRIVER_SERVICE_URL: http://driver-service:8082
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  driver-service:
+    # Репозиторий driver-service должен лежать рядом: ../citylogistics-driver-service
+    build: ../citylogistics-driver-service
+    container_name: logistics-driver-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-drivers:5432/drivers
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # Тот же ключ, что у core: оба берут его из одного .env
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+    depends_on:
+      postgres-drivers:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8082/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
 volumes:
   postgres_data:
