@@ -1,7 +1,8 @@
 # Весь проект одной командой: docker compose up --build
 # Только инфраструктура (сервисы запускаются из IDE):
-#   docker compose up -d postgres postgres-drivers kafka kafka-ui
-# Секреты (JWT_SECRET, INTERNAL_API_KEY) Compose берёт из файла .env рядом с этим файлом.
+#   docker compose up -d postgres postgres-drivers kafka kafka-ui keycloak
+# Секреты (INTERNAL_API_KEY, KEYCLOAK_CORE_CLIENT_SECRET, KEYCLOAK_ADMIN_PASSWORD)
+# Compose берёт из файла .env рядом с этим файлом.
 
 services:
   postgres:
@@ -78,6 +79,35 @@ services:
       kafka:
         condition: service_healthy
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.5
+    container_name: logistics-keycloak
+    # start-dev: режим разработки (HTTP, встроенная база H2). --import-realm: при первом старте
+    # создать realm из keycloak/realm-export.json, если его ещё нет
+    command: start-dev --import-realm
+    ports:
+      - "8180:8080"
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      # Адрес, который видит браузер. Он попадает в токены (поле iss), даже если запрос
+      # пришёл изнутри Docker на keycloak:8080, поэтому core проверяет один и тот же iss
+      KC_HOSTNAME: http://localhost:8180
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HEALTH_ENABLED: "true"
+      # Подставляется в realm-export.json вместо ${KEYCLOAK_CORE_CLIENT_SECRET}
+      KEYCLOAK_CORE_CLIENT_SECRET: ${KEYCLOAK_CORE_CLIENT_SECRET}
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    # В образе нет curl: спрашиваем /health/ready на служебном порту 9000 средствами bash
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
   core:
     build: .
     container_name: logistics-core
@@ -89,12 +119,17 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/logistics
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SERVICES_DRIVER_SERVICE_URL: http://driver-service:8082
-      JWT_SECRET: ${JWT_SECRET}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      # Ключи для проверки токенов и Admin API берём по внутреннему адресу Keycloak.
+      # iss в токенах остаётся http://localhost:8180/... (см. KC_HOSTNAME)
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_CORE_CLIENT_SECRET: ${KEYCLOAK_CORE_CLIENT_SECRET}
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://localhost:8080/actuator/health || exit 1"]
@@ -129,3 +164,4 @@ services:
 volumes:
   postgres_data:
   drivers_data:
+  keycloak_data:
