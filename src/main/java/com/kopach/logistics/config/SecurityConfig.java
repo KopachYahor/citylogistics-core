@@ -1,7 +1,6 @@
 package com.kopach.logistics.config;
 
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -9,10 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -24,22 +21,26 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final KeycloakJwtConverter keycloakJwtConverter;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    public SecurityConfig(KeycloakJwtConverter keycloakJwtConverter) {
+        this.keycloakJwtConverter = keycloakJwtConverter;
     }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        // Нет токена, токен неверный, истёк или пользователь не зарегистрирован в приложении
+        AuthenticationEntryPoint unauthorized = (request, response, e) ->
+                writeError(response, HttpStatus.UNAUTHORIZED, "Unauthorized");
+
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // /error открыт: иначе любая ошибка превращается в 403
-                        .requestMatchers("/actuator/health", "/api/auth/register", "/api/auth/login", "/error").permitAll()
-                        // hasRole("CLIENT") проверяет право ROLE_CLIENT
+                        .requestMatchers("/actuator/health", "/api/auth/register", "/error").permitAll()
+                        // hasRole("CLIENT") проверяет право ROLE_CLIENT (его выдаёт KeycloakJwtConverter)
                         .requestMatchers(HttpMethod.POST, "/api/orders").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.GET, "/api/orders/my").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.PATCH, "/api/orders/*/cancel").hasRole("CLIENT")
@@ -47,13 +48,17 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/api/orders/*/status").hasRole("DRIVER")
                         .anyRequest().authenticated()
                 )
+                // Core — OAuth2 Resource Server: токены выдаёт Keycloak, core только проверяет их
+                // открытым ключом Keycloak (настройки в spring.security.oauth2.resourceserver.jwt)
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(keycloakJwtConverter))
+                        .authenticationEntryPoint(unauthorized)
+                )
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((request, response, e) ->
-                                writeError(response, HttpStatus.UNAUTHORIZED, "Unauthorized"))
+                        .authenticationEntryPoint(unauthorized)
                         .accessDeniedHandler((request, response, e) ->
                                 writeError(response, HttpStatus.FORBIDDEN, "Access denied"))
-                )
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                );
 
         return http.build();
     }
@@ -79,18 +84,5 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
-    }
-
-    // Иначе Spring Boot зарегистрирует фильтр-бин второй раз, вне цепочки Security
-    @Bean
-    public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration(JwtAuthenticationFilter filter) {
-        FilterRegistrationBean<JwtAuthenticationFilter> registration = new FilterRegistrationBean<>(filter);
-        registration.setEnabled(false);
-        return registration;
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
     }
 }

@@ -197,7 +197,7 @@ class OrderServiceTest {
     }
 
     private User driverUser(Long driverId) {
-        User user = new User("driver@test.local", "hash", Role.DRIVER, LocalDateTime.now());
+        User user = new User("driver@test.local", "kc-driver", Role.DRIVER, LocalDateTime.now());
         user.setId(10L);
         user.setDriverId(driverId);
         return user;

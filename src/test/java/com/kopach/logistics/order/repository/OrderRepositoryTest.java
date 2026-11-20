@@ -80,7 +80,7 @@ class OrderRepositoryTest extends AbstractPostgresTest {
     private User newUser(String email) {
         return new User(
                 email,
-                "$2a$10$testtesttesttesttesttesttesttesttesttesttesttesttesttest",
+                "kc-" + email, // id пользователя в Keycloak
                 Role.CLIENT,
                 LocalDateTime.now()
         );

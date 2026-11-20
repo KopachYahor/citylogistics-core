@@ -3,8 +3,8 @@ package com.kopach.logistics.order.controller;
 import com.kopach.logistics.auth.entity.Role;
 import com.kopach.logistics.auth.entity.User;
 import com.kopach.logistics.auth.repository.UserRepository;
-import com.kopach.logistics.auth.service.JwtService;
 import com.kopach.logistics.config.AbstractPostgresTest;
+import com.kopach.logistics.config.TestJwts;
 import com.kopach.logistics.order.repository.OrderRepository;
 import com.kopach.logistics.order.service.OrderEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,9 +14,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+
+import static org.mockito.Mockito.when;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -39,8 +42,9 @@ class OrderControllerSecurityTest extends AbstractPostgresTest {
     @Autowired
     private OrderRepository orderRepository;
 
-    @Autowired
-    private JwtService jwtService;
+    // Вместо проверки подписи ключом Keycloak: строка токена -> готовый Jwt (см. TestJwts)
+    @MockBean
+    private JwtDecoder jwtDecoder;
 
     // Kafka здесь не нужна
     @MockBean
@@ -97,7 +101,11 @@ class OrderControllerSecurityTest extends AbstractPostgresTest {
     }
 
     private String tokenFor(String email, Role role) {
-        userRepository.save(new User(email, "not-used-hash", role, LocalDateTime.now()));
-        return jwtService.generateToken(email);
+        String keycloakId = "kc-" + email;
+        userRepository.save(new User(email, keycloakId, role, LocalDateTime.now()));
+        // В Bearer-токене допустимы только символы base64url, поэтому без email и @
+        String token = "token-" + role.name().toLowerCase();
+        when(jwtDecoder.decode(token)).thenReturn(TestJwts.keycloakJwt(keycloakId, role.name()));
+        return token;
     }
 }

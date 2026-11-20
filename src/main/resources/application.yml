@@ -21,6 +21,15 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Открытые ключи Keycloak: ими проверяется подпись токена. Скачиваются при первом запросе
+          jwk-set-uri: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/certs
+          # Ожидаемый iss в токене. Это адрес, который видит браузер, поэтому он не зависит от KEYCLOAK_URL
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/citylogistics}
+
   kafka:
     bootstrap-servers: localhost:29092
     producer:
@@ -53,10 +62,15 @@ management:
       # Только UP/DOWN, без деталей о БД и диске
       show-details: never
 
-jwt:
+# Keycloak. KEYCLOAK_URL — адрес, по которому core сам ходит в Keycloak:
+# из IDE это localhost:8180, из Docker — keycloak:8080 (задаётся в docker-compose.yml)
+keycloak:
+  url: ${KEYCLOAK_URL:http://localhost:8180}
+  realm: citylogistics
+  # Служебный клиент core для Admin API (создание пользователей при регистрации)
+  client-id: citylogistics-core
   # Из .env или переменной окружения, в git не хранится
-  secret: ${JWT_SECRET}
-  expiration: 86400000
+  client-secret: ${KEYCLOAK_CORE_CLIENT_SECRET}
 
 logging:
   level:
