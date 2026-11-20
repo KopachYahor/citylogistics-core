@@ -7,16 +7,17 @@
 
 | Репозиторий | Что это | Порт |
 |---|---|---|
-| **citylogistics-core** (этот) | Пользователи, JWT, заказы | 8080, БД `logistics` на 5432 |
+| **citylogistics-core** (этот) | Пользователи, регистрация, заказы | 8080, БД `logistics` на 5432 |
 | [citylogistics-driver-service](https://github.com/KopachYahor/citylogistics-driver-service) | Водители и их статусы | 8082, БД `drivers` на 5433 |
 | [citylogistics-frontend](https://github.com/KopachYahor/citylogistics-frontend) | HTML/CSS/Vanilla JS | 5500 |
 
 Инфраструктура для всех сервисов описана в `docker-compose.yml` этого репозитория.
+Вход и пароли — в **Keycloak** (порт 8180), он тоже поднимается из этого `docker-compose.yml`.
 
 ## Стек
 
 Java 21, Spring Boot 3.3 (Web, Data JPA, Security, Validation, Kafka), PostgreSQL 15,
-Flyway, JWT (JJWT) + BCrypt, Apache Kafka (KRaft, без ZooKeeper), Docker Compose,
+Flyway, Keycloak 26 (OAuth2 / OpenID Connect, Spring Security OAuth2 Resource Server), Apache Kafka (KRaft, без ZooKeeper), Docker Compose,
 JUnit 5, Mockito, MockMvc, Testcontainers.
 
 ## Архитектура
@@ -35,10 +36,38 @@ JUnit 5, Mockito, MockMvc, Testcontainers.
 
 - У каждого сервиса своя база (Database per Service). Внешних ключей между базами нет:
   `orders.driver_id` — это id водителя из другой базы, связь держит код, а не БД.
-- Фронтенд общается **только с core** по REST. Про Kafka он не знает.
+- Фронтенд общается с core по REST, а входит через Keycloak. Про Kafka он не знает.
 - Сервисы общаются через Kafka асинхронно. Синхронный REST-вызов один: при регистрации
   водителя core создаёт его профиль в driver-service. REST driver-service закрыт общим
   ключом: core передаёт его в заголовке `X-Internal-Api-Key`.
+
+### Вход через Keycloak
+
+```
+ Браузер ──1. «Войти»──▶ Keycloak (8180): страница входа, пароль вводится здесь
+    ▲                         │
+    └──2. редирект с code─────┘
+ Браузер ──3. code + code_verifier──▶ Keycloak ──▶ access token (5 мин) + refresh token
+ Браузер ──4. Authorization: Bearer <access token>──▶ core: проверка подписи открытым ключом Keycloak
+```
+
+- **Authorization Code + PKCE** (фронтенд, `js/auth.js`). Браузер — публичный клиент без
+  секрета, поэтому перехваченный `code` без исходного `code_verifier` бесполезен.
+- **core — OAuth2 Resource Server.** Токены выдаёт Keycloak, core только проверяет их: подпись
+  (RS256, открытые ключи берутся по `jwk-set-uri`), срок и издателя (`iss`). Общего секрета
+  для подписи, как было со своим JWT, больше нет.
+- **Роли** — роли realm `CLIENT` и `DRIVER`. Keycloak кладёт их в `realm_access.roles`,
+  `KeycloakJwtConverter` превращает их в `ROLE_CLIENT` / `ROLE_DRIVER`, а пользователя
+  приложения (`User`) находит по `sub` токена (колонка `users.keycloak_id`).
+- **Регистрация остаётся в core** (`POST /api/auth/register`): нужно выбрать роль и для
+  водителя создать профиль в driver-service. core создаёт пользователя в Keycloak через
+  Admin API (служебный клиент `citylogistics-core`, client credentials), затем своего `User`,
+  затем водителя. Если шаг падает, уже созданное удаляется.
+- Настройки realm (роли, клиенты, профиль пользователя) — в `keycloak/realm-export.json`,
+  Keycloak импортирует его при первом старте.
+- **Адреса Keycloak.** Браузер ходит на `localhost:8180`, core из Docker — на `keycloak:8080`.
+  Чтобы `iss` в токенах был одинаковым, у Keycloak задан `KC_HOSTNAME=http://localhost:8180`,
+  а core проверяет `iss` по `KEYCLOAK_ISSUER_URI`, ключи же скачивает по `KEYCLOAK_URL`.
 
 ### Kafka
 
@@ -76,8 +105,7 @@ NEW ──▶ ACCEPTED ──▶ IN_TRANSIT ──▶ ARRIVED ──▶ DELIVERE
 
 | Метод и адрес | Кто может | Что делает |
 |---|---|---|
-| `POST /api/auth/register` | все | Регистрация (ответ `201`). Тело: `name`, `email`, `password`, `role` (`CLIENT` / `DRIVER`), `phone` (обязателен для `DRIVER`). Email хранится в нижнем регистре |
-| `POST /api/auth/login` | все | Вход по `email` и `password`, в ответе `token` |
+| `POST /api/auth/register` | все | Регистрация (ответ `201`): пользователь в Keycloak, в core и, для водителя, в driver-service. Тело: `name`, `email`, `password`, `role` (`CLIENT` / `DRIVER`), `phone` (обязателен для `DRIVER`). Email хранится в нижнем регистре. Входа в core нет: токен выдаёт Keycloak |
 | `GET /api/auth/me` | любой вошедший | Текущий пользователь: `id`, `email`, `role`, `driverId` |
 | `GET /actuator/health` | все | Spring Boot Actuator: `UP`, если приложение и БД доступны, иначе `DOWN` и 503 |
 | `POST /api/orders` | `CLIENT` | Создать заказ (ответ `201`): `fromAddress`, `toAddress`, `price` |
@@ -86,16 +114,16 @@ NEW ──▶ ACCEPTED ──▶ IN_TRANSIT ──▶ ARRIVED ──▶ DELIVERE
 | `GET /api/orders/assigned` | `DRIVER` | Заказы, назначенные мне |
 | `PATCH /api/orders/{id}/status` | `DRIVER`, назначенный | Следующий статус: `{"status": "IN_TRANSIT"}` |
 
-Запросы, кроме открытых, требуют заголовок `Authorization: Bearer <token>`.
+Запросы, кроме открытых, требуют заголовок `Authorization: Bearer <access token Keycloak>`.
 
 | Код | Когда |
 |---|---|
 | 400 | Не прошла валидация, битый JSON, недопустимый переход статуса, email уже занят |
-| 401 | Нет токена, токен неверный или истёк, неверный пароль |
+| 401 | Нет токена, токен неверный или истёк, пользователь есть в Keycloak, но не зарегистрирован в приложении |
 | 403 | Не та роль, чужой заказ |
 | 404 | Заказ не найден |
 | 500 | Kafka недоступна дольше 5 секунд (см. ограничения) |
-| 503 | driver-service не ответил или отказал при регистрации водителя |
+| 503 | Keycloak или driver-service не ответил при регистрации |
 
 ## Запуск с нуля
 
@@ -113,16 +141,17 @@ NEW ──▶ ACCEPTED ──▶ IN_TRANSIT ──▶ ARRIVED ──▶ DELIVERE
    copy .env.example .env
    ```
    и вписать значения:
-   - `JWT_SECRET` — ключ подписи JWT;
-   - `INTERNAL_API_KEY` — общий ключ core и driver-service.
+   - `INTERNAL_API_KEY` — общий ключ core и driver-service;
+   - `KEYCLOAK_CORE_CLIENT_SECRET` — секрет служебного клиента core в Keycloak;
+   - `KEYCLOAK_ADMIN_PASSWORD` — пароль `admin` для консоли Keycloak (пусто — будет `admin`).
 
    Сгенерировать случайный ключ в PowerShell:
    ```
-   $b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)
+   $b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToHexString($b)
    ```
-   (или `openssl rand -base64 32`). Docker Compose сам читает `.env` рядом с `docker-compose.yml`
-   и передаёт ключи обоим сервисам, поэтому `INTERNAL_API_KEY` у них гарантированно одинаковый.
-3. Собрать образы сервисов и поднять всё: 2 базы PostgreSQL, Kafka, Kafka UI, core и driver-service.
+   (или `openssl rand -hex 32`). Docker Compose сам читает `.env` рядом с `docker-compose.yml`
+   и передаёт ключи сервисам и Keycloak, поэтому значения у всех гарантированно одинаковые.
+3. Собрать образы сервисов и поднять всё: 2 базы PostgreSQL, Kafka, Kafka UI, Keycloak, core и driver-service.
    ```
    docker compose up -d --build
    ```
@@ -131,6 +160,7 @@ NEW ──▶ ACCEPTED ──▶ IN_TRANSIT ──▶ ARRIVED ──▶ DELIVERE
    Flyway сам применит миграции.
 4. Проверить: `docker compose ps` показывает `healthy` у всех, кроме Kafka UI;
    `http://localhost:8080/actuator/health` отвечает `{"status":"UP"}`.
+   Консоль Keycloak: `http://localhost:8180` (логин `admin`), realm `citylogistics`.
    Сообщения в Kafka видно в Kafka UI: `http://localhost:8090`. Логи сервиса: `docker compose logs -f core`.
 
 ### Как устроен запуск в Docker
@@ -139,7 +169,7 @@ NEW ──▶ ACCEPTED ──▶ IN_TRANSIT ──▶ ARRIVED ──▶ DELIVERE
   (тесты при этом не запускаются, им нужен Docker), на втором jar кладётся в лёгкий образ
   только с JRE и запускается не от root.
 - **Адреса внутри Docker другие.** В контейнере `localhost` — это сам контейнер, а соседи доступны
-  по имени сервиса: `postgres:5432`, `kafka:9092`, `driver-service:8082`. В `application.yml`
+  по имени сервиса: `postgres:5432`, `kafka:9092`, `driver-service:8082`, `keycloak:8080`. В `application.yml`
   остаются адреса для запуска из IDE (`localhost`), а в `docker-compose.yml` они заменяются
   переменными окружения (`SPRING_DATASOURCE_URL` и т.п.): переменные окружения важнее `application.yml`.
 - **У Kafka два listener'а:** `kafka:9092` для контейнеров и `localhost:29092` для приложений на хосте.
@@ -150,12 +180,13 @@ NEW ──▶ ACCEPTED ──▶ IN_TRANSIT ──▶ ARRIVED ──▶ DELIVERE
 
 1. Поднять только инфраструктуру:
    ```
-   docker compose up -d postgres postgres-drivers kafka kafka-ui
+   docker compose up -d postgres postgres-drivers kafka kafka-ui keycloak
    ```
    Если перед этим всё было запущено целиком, сначала остановите контейнеры сервисов, иначе
    порты 8080 и 8082 будут заняты: `docker compose stop core driver-service`.
 2. Скопировать `.env.example` в `.env` и в репозитории driver-service, вписать тот же
-   `INTERNAL_API_KEY`. Spring сам читает `.env` из папки, откуда запущен сервис
+   `INTERNAL_API_KEY`. core из IDE берёт из своего `.env` и `KEYCLOAK_CORE_CLIENT_SECRET`
+   (тот же, что получил Keycloak), а Keycloak ищет на `localhost:8180`. Spring сам читает `.env` из папки, откуда запущен сервис
    (`spring.config.import` в `application.yml`).
 3. Запустить core (порт 8080): `.\mvnw.cmd spring-boot:run` или `LogisticsPlatformApplication`
    в IntelliJ IDEA (рабочая папка — корень репозитория).
@@ -167,15 +198,22 @@ NEW ──▶ ACCEPTED ──▶ IN_TRANSIT ──▶ ARRIVED ──▶ DELIVERE
 
 На macOS/Linux: `./mvnw` вместо `.\mvnw.cmd` и `cp` вместо `copy`.
 
-Если при старте core видите `WeakKeyException`, значит `JWT_SECRET` в `.env` пустой или слишком
-короткий: нужна base64-строка от 32 байт.
+Если регистрация возвращает `503`, а в логе core ошибка `401` от Keycloak, значит
+`KEYCLOAK_CORE_CLIENT_SECRET` в `.env` не совпадает с секретом клиента в Keycloak. Keycloak
+берёт секрет только при **первом** импорте realm: после смены секрета пересоздайте Keycloak
+(`docker compose rm -sf keycloak` и `docker volume rm citylogistics-core_keycloak_data`).
 
 Если регистрация водителя возвращает `503`, проверьте, что driver-service запущен и что
 `INTERNAL_API_KEY` у core и driver-service **одинаковый**: при разных ключах driver-service
 отвечает `401`, а core показывает это как `503` (настоящая причина видна в логе core).
 
-Остановить всё: `docker compose down`. Данные баз сохранятся в volume.
-Чтобы начать с пустыми базами: `docker compose down -v` (**удалит все данные**).
+Остановить всё: `docker compose down`. Данные баз и пользователи Keycloak сохранятся в volume.
+Чтобы начать с пустыми базами: `docker compose down -v` (**удалит все данные**, в том числе
+пользователей Keycloak; realm заново импортируется при следующем старте).
+
+**Переход со старой версии (свой JWT).** Миграция V9 удаляет `users.password_hash`: старые
+пользователи войти не смогут, их нет в Keycloak. Для локальной разработки проще всего
+начать с чистых баз: `docker compose down -v`.
 
 ### Быстрая проверка через curl
 
@@ -188,9 +226,8 @@ curl -X POST localhost:8080/api/auth/register -H "Content-Type: application/json
 curl -X POST localhost:8080/api/auth/register -H "Content-Type: application/json" \
   -d '{"name":"Driver","email":"driver@test.by","password":"secret1","phone":"+375291112233","role":"DRIVER"}'
 
-# вход: скопируйте token из ответа
-curl -X POST localhost:8080/api/auth/login -H "Content-Type: application/json" \
-  -d '{"email":"client@test.by","password":"secret1"}'
+# вход — через страницу Keycloak во фронтенде. Токен для curl можно взять там:
+# в консоли браузера localStorage.getItem('token') (живёт 5 минут)
 
 # заказ: через секунду он станет ACCEPTED с driverId
 curl -X POST localhost:8080/api/orders -H "Authorization: Bearer <token>" \
@@ -206,12 +243,15 @@ curl localhost:8080/api/orders/my -H "Authorization: Bearer <token>"
 
 Нужен запущенный Docker. Тесты сами поднимают временную PostgreSQL (Testcontainers),
 поэтому **не трогают** базу из `docker-compose`, а Flyway каждый раз применяет все
-миграции на пустую базу. Kafka, `JWT_SECRET` и `INTERNAL_API_KEY` для тестов не нужны.
+миграции на пустую базу. Kafka, Keycloak и секреты для тестов не нужны: `JwtDecoder` и
+`KeycloakAdminClient` подменяются моками (`@MockBean`). Подменённый `JwtDecoder` по строке
+токена возвращает готовый `Jwt` (`TestJwts`), поэтому `KeycloakJwtConverter` и правила
+`SecurityConfig` в тестах работают по-настоящему.
 
 | Вид | Классы | Что проверяют |
 |---|---|---|
-| Unit (Mockito) | `OrderServiceTest`, `DriverAssignedListenerTest`, `OrderStatusTest` | Бизнес-правила: переходы статусов, владелец и водитель заказа, обработка `driver.assigned` |
-| API (MockMvc) | `AuthControllerTest`, `OrderControllerSecurityTest`, `HealthEndpointTest` | Коды ответов, валидация, 401/403, права по ролям |
+| Unit (Mockito) | `OrderServiceTest`, `DriverAssignedListenerTest`, `OrderStatusTest`, `KeycloakJwtConverterTest` | Бизнес-правила: переходы статусов, владелец и водитель заказа, обработка `driver.assigned`, роли из токена Keycloak |
+| API (MockMvc) | `AuthControllerTest`, `OrderControllerSecurityTest`, `HealthEndpointTest` | Коды ответов, валидация, 401/403, права по ролям, регистрация через Keycloak и её откат |
 | Интеграционный (Testcontainers) | `OrderRepositoryTest` | Репозиторий на настоящей PostgreSQL |
 
 ## Ключевые решения
@@ -220,15 +260,18 @@ curl localhost:8080/api/orders/my -H "Authorization: Bearer <token>"
   шаг: нельзя перескочить `ACCEPTED → DELIVERED` или вернуться назад.
 - **Права проверяет бэкенд.** Роли — в `SecurityConfig` (`hasRole`), владелец заказа и
   назначенный водитель — в `OrderService`. Скрытые кнопки на фронтенде — не защита.
-- **JWT без состояния.** В токене только email (`sub`) и срок жизни. Роль при каждом
-  запросе берётся из базы (`CustomUserDetailsService`), поэтому смена роли действует сразу.
+- **Аутентификация вынесена в Keycloak.** core не хранит пароли и не выдаёт токены, а
+  только проверяет их (OAuth2 Resource Server). Роли берутся из токена, пользователь
+  приложения — из базы по `sub`. Keycloak даёт и то, чего не было в своём JWT: короткие
+  токены с обновлением, выход с завершением сессии, защиту от перебора паролей (`bruteForceProtected`).
 - **Пессимистическая блокировка.** Отмена заказа, смена статуса и назначение водителя
   читают заказ через `SELECT ... FOR UPDATE` внутри транзакции. Иначе одновременные
   отмена и назначение затирали бы друг друга (lost update).
 - **Слушатели не доверяют событиям вслепую.** Kafka доставляет «хотя бы один раз», события
   приходят с задержкой. Поэтому `DriverAssignedListener` проверяет текущий статус заказа.
-- **Компенсирующее действие при регистрации водителя.** Если driver-service не ответил
-  (таймаут 2 с на соединение, 5 с на ответ), пользователь удаляется, клиент получает 503.
+- **Компенсирующие действия при регистрации.** Порядок: Keycloak → `User` в core →
+  водитель в driver-service. Если driver-service не ответил (таймаут 2 с на соединение,
+  5 с на ответ), удаляются и `User`, и пользователь в Keycloak, клиент получает 503.
   Это ручной откат, а не полноценная Saga (см. ограничения).
 - **Сущности наружу не отдаются.** Ответы — DTO (`OrderResponse`, `UserResponse`).
 - **Сервис-сервис по общему ключу.** driver-service отвечает на REST только с правильным
@@ -255,11 +298,12 @@ curl localhost:8080/api/orders/my -H "Authorization: Bearer <token>"
 2. **Нет повторной попытки назначения.** Если свободных водителей нет, driver-service
    пишет предупреждение в лог, и заказ остаётся `NEW`. Когда водитель освобождается,
    ожидающие заказы никто не перепроверяет.
-3. **Откат при регистрации водителя не гарантирует согласованность.** Если driver-service
-   создал водителя, но ответил позже таймаута, core удалит пользователя, а водитель
-   в driver-service останется «сиротой». И наоборот: если core упадёт между сохранением
-   пользователя и ответом driver-service, откат не выполнится, и в core останется
-   пользователь-водитель без `driverId`.
+3. **Откат при регистрации не гарантирует согласованность.** Участников три: Keycloak, core,
+   driver-service. Если driver-service создал водителя, но ответил позже таймаута, core удалит
+   пользователя, а водитель в driver-service останется «сиротой» и будет получать заказы.
+   Если core упадёт посреди регистрации, откат не выполнится вовсе: например, в Keycloak
+   останется пользователь без `User` в core — войти он сможет, но API ответит `401`.
+   Если не удастся удалить пользователя в Keycloak, это видно только в логе core.
 4. **Защита driver-service простая.** Один общий ключ на всех: у него нет срока жизни и
    ролей, при утечке его нужно сменить вручную в обоих сервисах. Для учебного проекта
    хватает, в продакшене обычно используют токены сервисов (например, OAuth2 client
@@ -269,9 +313,14 @@ curl localhost:8080/api/orders/my -H "Authorization: Bearer <token>"
    класс с тем же именем. Поэтому, например, `DriverAssignedEvent` в core лежит в папке
    `order/dto`, но объявлен в пакете `com.kopach.logistics.driver.dto`. Переименование
    пакета в одном сервисе ломает чтение событий в другом.
-6. **JWT нельзя отозвать.** Токен действует 24 часа. Выхода из системы на сервере нет.
-7. **CORS разрешён только для `http://localhost:5500` и `http://127.0.0.1:5500`** (в коде).
-8. **Пароли баз в `docker-compose.yml`** — это значения только для локальной разработки.
-9. **История миграций.** V3 создаёт таблицу `order_status_history`, которая так и не
+6. **Access token нельзя отозвать.** После выхода уже выданный access token действует до
+   конца своего срока (5 минут): core проверяет токен сам, без запроса в Keycloak. Refresh
+   token и сессия Keycloak при выходе завершаются.
+7. **Keycloak в режиме разработки** (`start-dev`): HTTP, встроенная база H2 в volume,
+   пароль администратора по умолчанию `admin`. Для продакшена — `start` с HTTPS и PostgreSQL.
+   Аудиторию токена (`aud`) core не проверяет.
+8. **CORS разрешён только для `http://localhost:5500` и `http://127.0.0.1:5500`** (в коде).
+9. **Пароли баз в `docker-compose.yml`** — это значения только для локальной разработки.
+10. **История миграций.** V3 создаёт таблицу `order_status_history`, которая так и не
    понадобилась, V8 её удаляет. V4/V5 правились уже после применения (проект нигде
    не развёрнут). Правило на будущее: применённую миграцию не меняют, пишут новую.
