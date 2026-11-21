@@ -38,6 +38,11 @@ public class KeycloakAdminClient {
                                @Value("${keycloak.realm}") String realm,
                                @Value("${keycloak.client-id}") String clientId,
                                @Value("${keycloak.client-secret}") String clientSecret) {
+        if (clientSecret == null || clientSecret.isBlank()) {
+            // Иначе приложение запустится, а сломается только первая регистрация, причём с ответом 503
+            throw new IllegalStateException(
+                    "keycloak.client-secret (KEYCLOAK_CORE_CLIENT_SECRET) must not be empty");
+        }
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(CONNECT_TIMEOUT);
         requestFactory.setReadTimeout(READ_TIMEOUT);
@@ -76,6 +81,10 @@ public class KeycloakAdminClient {
         } catch (HttpClientErrorException.Conflict e) {
             // В Keycloak такой email уже есть (например, остался после сбоя)
             throw new IllegalArgumentException("Email already registered");
+        } catch (HttpClientErrorException.BadRequest e) {
+            // Keycloak отверг данные (например, «!» или скобки в имени). Это ошибка ввода,
+            // а не недоступность сервиса: клиент должен получить 400 с понятной причиной, а не 503
+            throw new IllegalArgumentException(badRequestMessage(e.getResponseBodyAsString()));
         }
 
         // Keycloak отвечает 201 и адресом нового пользователя: .../users/{id}
@@ -95,6 +104,22 @@ public class KeycloakAdminClient {
         }
         log.info("Keycloak user created: id={}, role={}", keycloakId, role);
         return keycloakId;
+    }
+
+    // Ответ Keycloak на неверные данные: {"field":"firstName","errorMessage":"error-person-name-invalid-character",...}.
+    // Переводим имя поля в имя из RegisterRequest, чтобы ошибка выглядела как обычная ошибка валидации
+    static String badRequestMessage(String responseBody) {
+        String body = responseBody == null ? "" : responseBody;
+        if (body.contains("\"field\":\"firstName\"")) {
+            return "name: contains characters that are not allowed";
+        }
+        if (body.contains("\"field\":\"email\"")) {
+            return "email: is not accepted";
+        }
+        if (body.contains("\"field\":\"username\"")) {
+            return "email: is not accepted as a login";
+        }
+        return "Invalid registration data";
     }
 
     // Компенсирующее действие при откате регистрации. Ошибку только пишем в лог:

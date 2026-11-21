@@ -129,6 +129,18 @@ class AuthControllerTest extends AbstractPostgresTest {
     }
 
     @Test
+    void register_whenKeycloakRejectsData_shouldReturn400WithReason() throws Exception {
+        // Например, «!» в имени: KeycloakAdminClient превращает 400 от Keycloak в IllegalArgumentException
+        when(keycloakAdminClient.createUser(anyString(), anyString(), anyString(), any(Role.class)))
+                .thenThrow(new IllegalArgumentException("name: contains characters that are not allowed"));
+
+        register(new RegisterRequest("Test!", "bang@example.com", "secret1", null, Role.CLIENT))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("name: contains characters that are not allowed"));
+        assertThat(userRepository.findByEmail("bang@example.com")).isEmpty();
+    }
+
+    @Test
     void register_driver_shouldLinkDriverFromDriverService() throws Exception {
         DriverDto driver = new DriverDto();
         driver.setId(42L);
