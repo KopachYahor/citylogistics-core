@@ -33,9 +33,20 @@ public class DriverAssignedListener {
                 event.getOrderId(), event.getDriverId());
 
         // Отмена заказа клиентом в этот момент подождёт коммита
-        Order order = orderRepository.findByIdForUpdate(event.getOrderId())
-                .orElseThrow(() -> new IllegalStateException(
-                        "Order not found: " + event.getOrderId()));
+        Order order = orderRepository.findByIdForUpdate(event.getOrderId()).orElse(null);
+        if (order == null) {
+            // Заказа нет (например, база core пересоздана, а событие осталось в Kafka). Раньше здесь
+            // было исключение: Kafka повторяла событие 10 раз, потом выбрасывала, а водитель оставался
+            // BUSY навсегда. Теперь сообщаем driver-service, что заказ закрыт, и он освобождает водителя
+            log.warn("Order {} not found, releasing driver {}", event.getOrderId(), event.getDriverId());
+            eventPublisher.publishOrderStatusChanged(new OrderStatusChangedEvent(
+                    event.getOrderId(),
+                    event.getDriverId(),
+                    OrderStatus.NEW.name(),
+                    OrderStatus.CANCELLED.name()
+            ));
+            return;
+        }
 
         // Событие асинхронное: заказ мог уже измениться
         if (!order.getStatus().canTransitionTo(OrderStatus.ACCEPTED)) {

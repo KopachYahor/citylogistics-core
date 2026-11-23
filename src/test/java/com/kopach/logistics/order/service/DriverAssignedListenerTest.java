@@ -63,6 +63,22 @@ class DriverAssignedListenerTest {
     }
 
     @Test
+    void unknownOrder_shouldReleaseDriverInsteadOfFailing() {
+        // заказа нет (например, база core пересоздана, а событие осталось в Kafka)
+        when(orderRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
+
+        listener.onDriverAssigned(new DriverAssignedEvent(99L, 5L));
+
+        // без исключения: иначе Kafka повторила бы событие, а потом выбросила его, и водитель остался бы BUSY
+        ArgumentCaptor<OrderStatusChangedEvent> captor = ArgumentCaptor.forClass(OrderStatusChangedEvent.class);
+        verify(eventPublisher).publishOrderStatusChanged(captor.capture());
+        assertThat(captor.getValue().getOrderId()).isEqualTo(99L);
+        assertThat(captor.getValue().getDriverId()).isEqualTo(5L);
+        assertThat(captor.getValue().getNewStatus()).isEqualTo("CANCELLED");
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
     void repeatedEventForAcceptedOrder_shouldBeIgnored() {
         // Kafka доставила то же событие второй раз (at-least-once)
         Order order = order(OrderStatus.ACCEPTED);
