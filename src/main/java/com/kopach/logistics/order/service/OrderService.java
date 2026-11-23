@@ -45,18 +45,22 @@ public class OrderService {
 
         Order saved = orderRepository.save(order);
 
-        OrderCreatedEvent event = new OrderCreatedEvent(
-                saved.getId(),
-                saved.getClientId(),
-                saved.getFromAddress(),
-                saved.getToAddress(),
-                saved.getPrice(),
-                saved.getStatus().name(),
-                saved.getCreatedAt()
-        );
-        eventPublisher.publishOrderCreated(event);
+        eventPublisher.publishOrderCreated(orderCreatedEvent(saved));
 
         return mapToResponse(saved);
+    }
+
+    // Общий для создания заказа и повтора в UnassignedOrderRetryScheduler
+    static OrderCreatedEvent orderCreatedEvent(Order order) {
+        return new OrderCreatedEvent(
+                order.getId(),
+                order.getClientId(),
+                order.getFromAddress(),
+                order.getToAddress(),
+                order.getPrice(),
+                order.getStatus().name(),
+                order.getCreatedAt()
+        );
     }
 
     public List<OrderResponse> getMyOrders(Long clientId) {

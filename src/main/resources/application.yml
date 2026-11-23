@@ -51,6 +51,14 @@ spring:
 server:
   port: 8080
 
+# Повтор назначения для заказов, которые долго без водителя (UnassignedOrderRetryScheduler)
+orders:
+  assignment-retry:
+    enabled: true
+    # Формат ISO-8601 (PT30S = 30 секунд): @Scheduled не понимает запись вида 30s
+    interval: PT30S # как часто проверять
+    min-age: 30s    # сколько заказ должен пролежать в NEW, чтобы его повторить
+
 management:
   endpoints:
     web:
