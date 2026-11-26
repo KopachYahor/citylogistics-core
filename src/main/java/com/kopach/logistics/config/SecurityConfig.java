@@ -40,6 +40,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // /error открыт: иначе любая ошибка превращается в 403
                         .requestMatchers("/actuator/health", "/api/auth/register", "/error").permitAll()
+                        // Swagger UI и описание API открыты: это документация, данных там нет
+                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         // hasRole("CLIENT") проверяет право ROLE_CLIENT (его выдаёт KeycloakJwtConverter)
                         .requestMatchers(HttpMethod.POST, "/api/orders").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.GET, "/api/orders/my").hasRole("CLIENT")
