@@ -33,6 +33,8 @@ public class OrderService {
         this.userRepository = userRepository;
     }
 
+    // Заказ и событие order.created (в outbox) сохраняются в одной транзакции
+    @Transactional
     public OrderResponse createOrder(CreateOrderRequest request, Long clientId) {
         Order order = new Order();
         order.setClientId(clientId);

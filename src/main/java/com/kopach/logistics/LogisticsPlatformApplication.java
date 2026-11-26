@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
-// Для UnassignedOrderRetryScheduler (повтор назначения водителя)
+// Для OutboxRelay (отправка событий в Kafka) и UnassignedOrderRetryScheduler (повтор назначения)
 @EnableScheduling
 public class LogisticsPlatformApplication {
 

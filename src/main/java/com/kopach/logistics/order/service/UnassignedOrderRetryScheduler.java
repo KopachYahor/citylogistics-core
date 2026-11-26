@@ -9,13 +9,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
-// Повтор назначения. Если в момент создания заказа свободных водителей не было или событие
-// order.created потерялось (Kafka была недоступна), заказ навсегда остался бы NEW. Раз в
+// Повтор назначения. Если в момент создания заказа свободных водителей не было, заказ
+// навсегда остался бы NEW: driver-service сам к нему не возвращается. Раз в
 // interval планировщик заново публикует order.created для заказов, которые в NEW дольше
 // min-age. Повтор безопасен: driver-service не создаёт второе назначение (идемпотентность),
 // а если назначение уже есть — отправляет его ещё раз, и core примет его как обычно
@@ -41,6 +42,8 @@ public class UnassignedOrderRetryScheduler {
     // Значение — миллисекунды или ISO-8601 (PT30S); запись вида 30s @Scheduled не принимает
     @Scheduled(fixedDelayString = "${orders.assignment-retry.interval:PT30S}",
             initialDelayString = "${orders.assignment-retry.interval:PT30S}")
+    // Транзакция нужна OrderEventPublisher: повторные события записываются в outbox
+    @Transactional
     public void republishUnassignedOrders() {
         // Совсем свежие заказы не трогаем: их первое событие, скорее всего, ещё обрабатывается
         List<Order> waiting = orderRepository.findTop50ByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(

@@ -59,6 +59,16 @@ orders:
     interval: PT30S # как часто проверять
     min-age: 30s    # сколько заказ должен пролежать в NEW, чтобы его повторить
 
+# Transactional Outbox: события сначала пишутся в outbox_events, OutboxRelay отправляет их в Kafka
+outbox:
+  relay:
+    interval: PT1S      # как часто отправлять (ISO-8601: @Scheduled не понимает 1s)
+    initial-delay: PT5S
+    batch-size: 100     # сколько событий за один запуск
+    send-timeout: 10s   # сколько ждать подтверждения Kafka
+  retention: 7d         # сколько хранить отправленные события
+  cleanup-cron: "0 0 * * * *"  # удаление старых — раз в час
+
 management:
   endpoints:
     web:
